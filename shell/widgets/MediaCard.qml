@@ -7,16 +7,17 @@ import "../services"
 // Compact now-playing card (control centre): the cover tints the card.
 ClippingRectangle {
     id: root
-    implicitHeight: 88
-    radius: 20
+    implicitHeight: Theme.tile + Theme.padCard * 2
+    radius: Theme.rCard
     color: Theme.card
 
     property real pos: 0
+    property bool live: true        // false while its panel is hidden: no position updates
     Timer {
         interval: 1000
         repeat: true
         triggeredOnStart: true
-        running: root.visible && Media.playing
+        running: root.live && root.visible && Media.playing
         onTriggered: root.pos = Media.active?.position ?? 0
     }
     Connections {
@@ -44,12 +45,12 @@ ClippingRectangle {
 
     RowLayout {
         anchors.fill: parent
-        anchors.margins: 12
+        anchors.margins: Theme.padCard
         spacing: 12
         ClippingRectangle {
-            Layout.preferredWidth: 60
-            Layout.preferredHeight: 60
-            radius: 14
+            Layout.preferredWidth: Theme.tile
+            Layout.preferredHeight: Theme.tile
+            radius: Theme.rThumb
             color: Theme.surfaceHighest
             Image {
                 anchors.fill: parent
@@ -62,7 +63,7 @@ ClippingRectangle {
                 anchors.centerIn: parent
                 visible: !Media.art.length
                 icon: "music_note"
-                size: 26
+                size: 28
                 color: Theme.textDim
             }
         }
@@ -98,19 +99,17 @@ ClippingRectangle {
         }
         IconBtn {
             icon: "skip_previous"
-            size: 32
+            tonal: false
             onClicked: Media.previous()
         }
         IconBtn {
             icon: Media.playing ? "pause" : "play_arrow"
-            size: 40
-            iconSize: 22
             active: true
             onClicked: Media.toggle()
         }
         IconBtn {
             icon: "skip_next"
-            size: 32
+            tonal: false
             onClicked: Media.next()
         }
     }

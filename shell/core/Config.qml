@@ -26,6 +26,20 @@ Singleton {
         }
     }
 
+    // Settings › About › Reset: everything back to its default (the wallpaper,
+    // the welcome flag and app launch counts stay). Each key is written
+    // explicitly: JsonAdapter keeps in-memory values for keys a file lacks.
+    function reset() {
+        const o = adapter;
+        o.transition = "grow"; o.themeApps = true; o.dnd = false; o.use24h = true;
+        o.workspaceNumbers = true; o.caffeine = false; o.terminal = "";
+        o.light = false; o.scheme = "content"; o.textSize = 0;
+        o.barTitle = true; o.barMedia = true; o.barDate = true; o.batteryPercent = true;
+        o.popupTime = "normal"; o.autoWallpaper = 0; o.accent = ""; o.roundness = 1; o.motion = 2;
+        o.clockSeconds = false; o.weekStart = "locale"; o.lockMedia = true;
+        o.nightLight = false; o.nightTemp = 4500;
+    }
+
     function bumpLaunch(id) {
         const l = Object.assign({}, adapter.launches || {});
         l[id] = (l[id] || 0) + 1;
@@ -58,11 +72,36 @@ Singleton {
             property bool themeApps: true         // run the shared matugen templates too (terminals, borders…)
             property bool dnd: false
             property bool use24h: true
-            property bool workspaceNumbers: false
-            property bool japanese: false         // optional: kanji weekday in the bar, JP date on the lock screen
+            property bool workspaceNumbers: true    // numbered workspace pills (off = dots)
             property bool caffeine: false
             property string terminal: ""          // for Terminal=true apps; empty = $TERMINAL, else kitty
             property var launches: ({})
+            property bool welcomed: false         // the first-run welcome has been shown
+            // appearance
+            property bool light: false            // light mode (matugen -m light)
+            property string scheme: "content"     // matugen scheme: content | tonal-spot | vibrant | expressive | fidelity | monochrome
+            property int textSize: 0              // 0 default, 1 large, 2 larger
+            // bar
+            property bool barTitle: true          // the focused window's title
+            property bool barMedia: true          // what's playing
+            property bool barDate: true           // the date beside the time
+            property bool batteryPercent: true
+            // notifications
+            property string popupTime: "normal"   // short 4 s | normal 6 s | long 10 s
+            // wallpaper
+            property int autoWallpaper: 0         // minutes between automatic changes, 0 = off
+            // more appearance
+            property string accent: ""            // "" = from the wallpaper, else a seed colour "#rrggbb"
+            property int roundness: 1             // 0 square, 1 rounded, 2 round
+            property int motion: 2                // 0 off, 1 reduced, 2 full
+            // clock & calendar
+            property bool clockSeconds: false
+            property string weekStart: "locale"   // locale | monday | sunday
+            // lock screen
+            property bool lockMedia: true         // what's playing on the lock screen
+            // display
+            property bool nightLight: false       // hyprsunset
+            property int nightTemp: 4500          // kelvin
         }
     }
 }

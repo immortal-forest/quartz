@@ -11,14 +11,17 @@ import "../widgets"
 PanelWindow {
     id: win
     property bool lingering: true
-    readonly property int cardW: 380
+    readonly property int cardW: 400
 
     screen: Quickshell.screens.find(s => s.name === Ui.focusedScreen()) ?? Quickshell.screens[0]
     anchors { top: true; right: true }
     exclusionMode: ExclusionMode.Normal
     exclusiveZone: 0
     implicitWidth: cardW + Theme.gap + 28
-    implicitHeight: Math.max(1, list.contentHeight + 46)
+    property real maxH: 1
+    readonly property real needH: list.implicitHeight + Theme.gap + 40
+    onNeedHChanged: maxH = Notifs.toasts.count ? Math.max(maxH, needH) : maxH
+    implicitHeight: Math.max(1, maxH)
     color: "transparent"
     WlrLayershell.namespace: "quartz-toast"
     WlrLayershell.layer: WlrLayer.Top
@@ -35,54 +38,67 @@ PanelWindow {
         x: list.x
         y: list.y
         width: list.width
-        height: list.contentHeight
+        height: list.implicitHeight
     }
 
-    ListView {
+    // A Column, not a ListView: cards change height after they appear (a
+    // preview image loads), and a ListView sized to its own content
+    // under-measures them — the next card then covered the buttons.
+    Column {
         id: list
         x: 28
-        y: 6
+        y: Theme.gap
         width: win.cardW
-        height: contentHeight
-        interactive: false
-        spacing: 8
-        model: Notifs.toasts
-        delegate: Item {
-            id: d
-            required property int nid
-            width: list.width
-            height: card.implicitHeight
-            NotifCard {
-                id: card
-                width: parent.width
-                nid: d.nid
-                toast: true
-                onHideRequested: Notifs.hideToast(d.nid)
-            }
-            Timer {
-                interval: card.actions.length ? 9000 : 5500
-                running: !card.critical && !card.hovered
-                onTriggered: {
-                    if (card.n?.transient)
-                        card.n.expire();
-                    Notifs.hideToast(d.nid);
+        spacing: Theme.spacing
+        move: Transition {
+            NumberAnimation { properties: "y"; duration: Anim.slow; easing.type: Easing.BezierSpline; easing.bezierCurve: Anim.emphasized }
+        }
+        Repeater {
+            model: Notifs.toasts
+            delegate: Item {
+                id: d
+                required property int nid
+                width: list.width
+                height: card.implicitHeight
+                // slides in from the right, slides back out before it's removed
+                property bool entered: false
+                property bool leaving: false
+                Component.onCompleted: entered = true
+                opacity: entered && !leaving ? 1 : 0
+                transform: Translate {
+                    x: d.leaving ? win.cardW * 0.6 : d.entered ? 0 : win.cardW * 0.5
+                    Behavior on x { Ease { duration: d.leaving ? Anim.normal : Anim.slower; easing.bezierCurve: d.leaving ? Anim.accel : Anim.decel } }
+                }
+                Behavior on opacity { Ease { duration: Anim.normal } }
+                function leave() {
+                    if (leaving)
+                        return;
+                    leaving = true;
+                    gone.start();
+                }
+                Timer {
+                    id: gone
+                    interval: Anim.normal + 20
+                    onTriggered: Notifs.hideToast(d.nid)
+                }
+                NotifCard {
+                    id: card
+                    width: parent.width
+                    nid: d.nid
+                    toast: true
+                    onHideRequested: d.leave()
+                }
+                Timer {
+                    // Settings › Notifications › Pop-up time (+3 s when there are buttons to press)
+                    interval: (Config.opt.popupTime === "short" ? 4000 : Config.opt.popupTime === "long" ? 10000 : 6000) + (card.actions.length || card.shot ? 3000 : 0)
+                    running: !card.critical && !card.hovered && !d.leaving
+                    onTriggered: {
+                        if (card.n?.transient)
+                            card.n.expire();
+                        d.leave();
+                    }
                 }
             }
-        }
-        add: Transition {
-            ParallelAnimation {
-                NumberAnimation { property: "x"; from: win.cardW * 0.6; to: 0; duration: Anim.slower; easing.type: Easing.OutBack; easing.overshoot: 0.9 }
-                NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Anim.normal }
-            }
-        }
-        remove: Transition {
-            ParallelAnimation {
-                NumberAnimation { property: "x"; to: win.cardW * 0.7; duration: Anim.normal; easing.type: Easing.BezierSpline; easing.bezierCurve: Anim.accel }
-                NumberAnimation { property: "opacity"; to: 0; duration: Anim.normal }
-            }
-        }
-        displaced: Transition {
-            NumberAnimation { properties: "x,y"; duration: Anim.slow; easing.type: Easing.BezierSpline; easing.bezierCurve: Anim.emphasized }
         }
     }
 }

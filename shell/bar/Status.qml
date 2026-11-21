@@ -11,49 +11,56 @@ Rectangle {
     property string screenName: ""
     readonly property bool open: Ui.panel === "control" && Ui.screen === screenName
 
-    implicitWidth: row.implicitWidth + 22
-    implicitHeight: 28
-    radius: 9
+    implicitWidth: row.implicitWidth + Theme.padCard * 2
+    implicitHeight: Theme.barItem
+    radius: Theme.rBarItem
     color: open ? Theme.alpha(Theme.primary, 0.16) : "transparent"
     Behavior on color { CAnim {} }
 
     RowLayout {
         id: row
         anchors.centerIn: parent
-        spacing: 10
+        spacing: Theme.spacing
         Icon {
             icon: Net.icon
-            size: 17
+            size: Theme.iconBar
             fill: 1
+            tight: true
         }
         Icon {
             visible: Bt.on
             icon: Bt.icon
-            size: 17
+            size: Theme.iconBar
+            fill: 1
+            tight: true
         }
         Icon {
             icon: Audio.icon
-            size: 18
+            size: Theme.iconBar
             fill: 1
+            tight: true
             color: Audio.muted ? Theme.textDim : Theme.text
         }
-        Battery {}
+        Battery { showText: Config.opt.batteryPercent }
         Item {
-            implicitWidth: 17
-            implicitHeight: 17
+            implicitWidth: bell.width
+            implicitHeight: Theme.iconBar
             Icon {
+                id: bell
                 anchors.centerIn: parent
+                tight: true
                 icon: Config.opt.dnd ? "notifications_off" : "notifications"
-                size: 17
+                size: Theme.iconBar
                 fill: Notifs.count > 0 ? 1 : 0
                 color: Config.opt.dnd ? Theme.textDim : Theme.text
             }
             Rectangle {
                 visible: Notifs.count > 0 && !Config.opt.dnd
-                x: 10
-                y: 0
-                width: 7
-                height: 7
+                // the unread dot sits on the bell's shoulder, measured to its ink
+                x: parent.width - 6
+                y: -1
+                width: 8
+                height: 8
                 radius: 4
                 color: Theme.primary
                 border.width: 1.5

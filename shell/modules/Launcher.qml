@@ -83,124 +83,107 @@ OverlayWin {
         id: card
         anchors.horizontalCenter: parent.horizontalCenter
         y: Math.round(parent.height * 0.16)
-        width: 600
-        height: col.implicitHeight + 20
-        radius: Theme.rXL
-        Behavior on height { Ease { duration: Anim.normal; easing.bezierCurve: Anim.standard } }
+        width: 640
+        height: col.implicitHeight + Theme.padCard * 2
+        Behavior on height { enabled: win.settled; Ease { duration: Anim.normal; easing.bezierCurve: Anim.standard } }
         MouseArea { anchors.fill: parent }   // clicks on the card don't close it
 
         ColumnLayout {
             id: col
-            x: 10
-            y: 10
-            width: parent.width - 20
-            spacing: 6
+            x: Theme.padCard
+            y: Theme.padCard
+            width: parent.width - Theme.padCard * 2
+            spacing: Theme.spacing
 
-            Rectangle {
+            Field {
+                rowAligned: true
+                id: field
                 Layout.fillWidth: true
-                implicitHeight: 52
-                radius: 22
-                color: Theme.alpha(Theme.text, 0.06)
-                RowLayout {
-                    anchors.fill: parent
-                    anchors.leftMargin: 18
-                    anchors.rightMargin: 18
-                    spacing: 12
-                    Icon {
-                        icon: "search"
-                        size: 22
-                        color: Theme.primary
-                    }
-                    TextInput {
-                        id: input
-                        Layout.fillWidth: true
-                        focus: true
-                        color: Theme.text
-                        font.family: Theme.font
-                        font.pixelSize: 17
-                        selectionColor: Theme.primary
-                        selectedTextColor: Theme.primaryText
-                        clip: true
-                        text: win.query
-                        onTextChanged: win.query = text
-                        Component.onCompleted: forceActiveFocus()
-                        Keys.onDownPressed: win.sel = Math.min(win.results.length - 1, win.sel + 1)
-                        Keys.onUpPressed: win.sel = Math.max(0, win.sel - 1)
-                        Keys.onTabPressed: win.sel = (win.sel + 1) % Math.max(1, win.results.length)
-                        Keys.onReturnPressed: win.accept()
-                        Keys.onEnterPressed: win.accept()
-                        T {
-                            visible: !input.text.length
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: "Search apps, or type a sum"
-                            font.pixelSize: 17
-                            color: Theme.textDim
-                        }
-                    }
-                }
+                implicitHeight: 48
+                icon: "search"
+                placeholder: "Search apps, or type a sum"
+                fontSize: Theme.fsTitle
+                text: win.query
+                onTextChanged: win.query = text
+                Component.onCompleted: input.forceActiveFocus()
+                onNavigate: step => win.sel = step > 0 ? (win.sel + 1) % Math.max(1, win.results.length) : Math.max(0, win.sel - 1)
+                onAccepted: win.accept()
             }
 
+            // maths: a list row, already selected — Enter copies the result
             Rectangle {
                 visible: win.calc.length > 0
                 Layout.fillWidth: true
-                implicitHeight: 58
-                radius: 18
-                color: Theme.primaryContainer
+                implicitHeight: Theme.row
+                radius: Theme.rCard
+                color: Theme.alpha(Theme.primary, 0.16)
                 RowLayout {
                     anchors.fill: parent
-                    anchors.leftMargin: 18
-                    anchors.rightMargin: 18
+                    anchors.leftMargin: (Theme.row - Theme.ctl) / 2
+                    anchors.rightMargin: (Theme.row - Theme.ctl) / 2
                     spacing: 12
-                    Icon { icon: "calculate"; size: 22; fill: 1; color: Theme.primaryContainerText }
+                    Rectangle {
+                        implicitWidth: Theme.ctl
+                        implicitHeight: Theme.ctl
+                        radius: Theme.rThumb
+                        color: Theme.alpha(Theme.primary, 0.16)
+                        Icon { anchors.fill: parent; icon: "calculate"; fill: 1; color: Theme.primary }
+                    }
                     T {
                         Layout.fillWidth: true
                         text: "= " + win.calc
                         font.family: Theme.display
-                        font.pixelSize: 22
+                        font.pixelSize: Theme.fsLarge
                         font.weight: Font.Medium
-                        color: Theme.primaryContainerText
+                        color: Theme.primary
                     }
-                    T { text: "Enter to copy"; font.pixelSize: Theme.fsSmall; color: Theme.alpha(Theme.primaryContainerText, 0.7) }
+                    Icon {
+                        Layout.preferredWidth: Theme.ctl
+                        icon: "keyboard_return"
+                        color: Theme.primary
+                    }
                 }
             }
 
             ListView {
                 id: list
                 Layout.fillWidth: true
-                implicitHeight: Math.min(contentHeight, 7 * 54)
+                implicitHeight: Math.min(contentHeight, 7 * Theme.row)
                 visible: win.results.length > 0 && !win.calc.length
                 clip: true
                 model: win.results
                 currentIndex: win.sel
                 boundsBehavior: Flickable.StopAtBounds
-                highlightMoveDuration: 160
+                // an edge fades only while the selected row isn't flush against it
+                readonly property real curTop: currentItem ? currentItem.y - contentY : 0
+                readonly property real curBottom: currentItem ? currentItem.y + currentItem.height - contentY : 0
+                highlightMoveDuration: Anim.fast
                 highlightFollowsCurrentItem: true
                 highlight: Rectangle {
-                    radius: 16
-                    color: Theme.alpha(Theme.primary, 0.14)
+                    radius: Theme.rCard
+                    color: Theme.alpha(Theme.primary, 0.16)
                 }
                 delegate: Item {
                     id: row
                     required property var modelData
                     required property int index
                     width: list.width
-                    height: 54
+                    height: Theme.row
                     RowLayout {
                         anchors.fill: parent
-                        anchors.leftMargin: 12
-                        anchors.rightMargin: 14
-                        spacing: 14
+                        anchors.leftMargin: (Theme.row - Theme.ctl) / 2
+                        anchors.rightMargin: (Theme.row - Theme.ctl) / 2
+                        spacing: 12
                         AppIcon {
-                            size: 34
+                            size: Theme.ctl
                             name: row.modelData.icon
                         }
                         ColumnLayout {
                             Layout.fillWidth: true
-                            spacing: 0
+                            spacing: 1
                             T {
                                 Layout.fillWidth: true
                                 text: row.modelData.name
-                                font.pixelSize: Theme.fsTitle
                                 font.weight: row.index === win.sel ? Font.DemiBold : Font.Medium
                             }
                             T {
@@ -212,9 +195,9 @@ OverlayWin {
                             }
                         }
                         Icon {
-                            visible: row.index === win.sel
+                            Layout.preferredWidth: Theme.ctl
+                            opacity: row.index === win.sel ? 1 : 0
                             icon: "keyboard_return"
-                            size: 16
                             color: Theme.primary
                         }
                     }
@@ -226,15 +209,42 @@ OverlayWin {
                         onClicked: win.launch(row.modelData)
                     }
                 }
+                // soft edges where rows scroll out of view
+                Rectangle {
+                    anchors { left: parent.left; right: parent.right; top: parent.top }
+                    height: Theme.padCard * 2
+                    opacity: !list.atYBeginning && list.curTop > 0.5 ? 1 : 0
+                    Behavior on opacity { Ease { duration: Anim.fast } }
+                    gradient: Gradient {
+                        GradientStop { position: 0; color: card.color }
+                        GradientStop { position: 1; color: Theme.alpha(card.color, 0) }
+                    }
+                }
+                Rectangle {
+                    anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
+                    height: Theme.padCard * 2
+                    opacity: !list.atYEnd && list.curBottom < list.height - 0.5 ? 1 : 0
+                    Behavior on opacity { Ease { duration: Anim.fast } }
+                    gradient: Gradient {
+                        GradientStop { position: 0; color: Theme.alpha(card.color, 0) }
+                        GradientStop { position: 1; color: card.color }
+                    }
+                }
             }
 
             T {
                 visible: !win.results.length && !win.calc.length
                 Layout.alignment: Qt.AlignHCenter
-                Layout.topMargin: 14
-                Layout.bottomMargin: 14
+                Layout.topMargin: Theme.pad
+                Layout.bottomMargin: Theme.pad
                 text: "No apps match “" + win.query + "”"
                 color: Theme.textDim
+            }
+            KeyHint {
+                Layout.alignment: Qt.AlignHCenter
+                hints: win.calc.length
+                    ? [{ keys: ["keyboard_return"], label: "Copy" }, { keys: ["Esc"], label: "Close" }]
+                    : [{ keys: ["keyboard_arrow_up", "keyboard_arrow_down"], label: "Select" }, { keys: ["keyboard_return"], label: "Open" }, { keys: ["Esc"], label: "Close" }]
             }
         }
     }

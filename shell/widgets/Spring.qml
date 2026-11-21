@@ -1,8 +1,13 @@
 import QtQuick
+import "../core"
 
-// Spatial spring (slight overshoot). Use epsilon ~0.005 for scale/opacity-scale values.
+// Spatial spring (slight overshoot). Set baseSpring / baseDamping; with reduced
+// or no motion (Settings › Appearance) it turns into a quick, flat settle.
+// Use epsilon ~0.005 for scale/opacity-scale values.
 SpringAnimation {
-    spring: 3.4
-    damping: 0.34
+    property real baseSpring: 3.4
+    property real baseDamping: 0.34
+    spring: Anim.full ? baseSpring : Anim.k > 0 ? 12 : 60
+    damping: Anim.full ? baseDamping : 1
     epsilon: 0.25
 }

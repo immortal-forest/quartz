@@ -21,7 +21,6 @@ Item {
         interval: 30
         onTriggered: surf.entered = true
     }
-    readonly property var jpWeek: ["日曜日", "月曜日", "火曜日", "水曜日", "木曜日", "金曜日", "土曜日"]
 
     SystemClock {
         id: clock
@@ -86,19 +85,11 @@ Item {
                 font.weight: Font.Medium
                 color: Theme.alpha(Theme.text, 0.85)
             }
-            T {
-                visible: Config.opt.japanese
-                Layout.alignment: Qt.AlignHCenter
-                Layout.topMargin: 4
-                text: (clock.date.getMonth() + 1) + "月" + clock.date.getDate() + "日 " + surf.jpWeek[clock.date.getDay()]
-                font.pixelSize: 16
-                color: Theme.primary
-            }
         }
 
         // now playing
         Rectangle {
-            visible: Media.hasTrack
+            visible: Media.hasTrack && Config.opt.lockMedia
             anchors.horizontalCenter: parent.horizontalCenter
             y: parent.height * 0.56
             width: 360
@@ -227,7 +218,7 @@ Item {
                                     radius: 5
                                     color: Theme.text
                                     scale: visible ? 1 : 0
-                                    Behavior on scale { Spring { spring: 5; damping: 0.4; epsilon: 0.01 } }
+                                    Behavior on scale { Spring { baseSpring: 5; baseDamping: 0.4; epsilon: 0.01 } }
                                 }
                             }
                         }

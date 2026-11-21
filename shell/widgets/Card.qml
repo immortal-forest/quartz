@@ -3,12 +3,15 @@ import QtQuick.Effects
 import "../core"
 
 // Panel material: frosted glass (Hyprland blurs behind), a hairline edge and a
-// soft shadow (SDF, cheap). Content goes inside.
+// soft shadow (SDF, cheap). Content goes inside. `radiusTop` lets a panel that
+// hangs from the bar keep square top corners.
 Item {
     id: root
-    property real radius: Theme.rLarge
+    property real radius: Theme.rSurface
+    property real radiusTop: radius
     property color color: Theme.glassStrong
     property bool shadow: true
+    property bool edge: true
     default property alias content: body.data
 
     RectangularShadow {
@@ -24,8 +27,10 @@ Item {
         id: bg
         anchors.fill: parent
         radius: root.radius
+        topLeftRadius: root.radiusTop
+        topRightRadius: root.radiusTop
         color: root.color
-        border.width: 1
+        border.width: root.edge ? 1 : 0
         border.color: Theme.hairline
     }
     Item {

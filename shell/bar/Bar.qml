@@ -8,10 +8,22 @@ import "../widgets"
 
 // The floating bar: a frosted pill inset by Hyprland's gaps_out, so its edges
 // line up with the windows below it.
+//
+// Layout: every chip is barItem tall and sits `inset` in from the pill's ends,
+// the same as from its top and bottom, so chip corners (rBarItem) are concentric
+// with the bar's (rBar). Chips pad their content by Theme.padCard; groups are
+// Theme.spacing apart; nothing on either side comes closer than `clockGap` to
+// the centred clock — the window title and the media title elide there.
 PanelWindow {
     id: bar
     required property var scr
     readonly property var monitor: Hyprland.monitorFor(scr)
+    // a panel hanging flush from this end of the bar: square that corner off
+    property bool joinLeft: false
+    property bool joinRight: false
+
+    readonly property real inset: (Theme.barHeight - Theme.barItem) / 2
+    readonly property real clockGap: Theme.spacing * 2
 
     screen: scr
     anchors { top: true; left: true; right: true }
@@ -21,6 +33,20 @@ PanelWindow {
     WlrLayershell.namespace: "quartz-bar"
     WlrLayershell.layer: WlrLayer.Top
     mask: Region { item: pill }
+
+    // where the dropdowns hang from
+    readonly property real clockX: pill.x + clock.x + clock.width / 2
+    readonly property real mediaX: pill.x + rightRow.x + media.x + media.width / 2
+    readonly property real statusX: pill.x + rightRow.x + status.x + status.width / 2
+    function publish() {
+        Ui.setAnchor(scr.name, "calendar", clockX);
+        Ui.setAnchor(scr.name, "media", media.width > 1 ? mediaX : statusX);
+        Ui.setAnchor(scr.name, "control", statusX);
+    }
+    onClockXChanged: publish()
+    onMediaXChanged: publish()
+    onStatusXChanged: publish()
+    Component.onCompleted: publish()
 
     IdleInhibitor {
         window: bar
@@ -33,45 +59,56 @@ PanelWindow {
         y: Theme.gap
         width: bar.width - Theme.gap * 2
         height: Theme.barHeight
-        radius: 14
-        color: Theme.glass
-        border.width: 1
-        border.color: Theme.hairline
+        radius: Theme.rBar
+        bottomLeftRadius: bar.joinLeft ? 0 : Theme.rBar
+        bottomRightRadius: bar.joinRight ? 0 : Theme.rBar
+        Behavior on bottomLeftRadius { Ease { duration: Anim.fast } }
+        Behavior on bottomRightRadius { Ease { duration: Anim.fast } }
+        color: Theme.glassStrong
 
-        RowLayout {
-            anchors.left: parent.left
-            anchors.leftMargin: 5
+        // left: workspaces at a fixed spot, then the window title. The title is
+        // capped (420 px, and never past the clock) and can never push or cover
+        // the workspaces.
+        Workspaces {
+            id: ws
+            x: bar.inset
             anchors.verticalCenter: parent.verticalCenter
-            spacing: 4
-            Workspaces {
-                id: ws
-                monitor: bar.monitor
-            }
-            ActiveWindow {
-                monitor: bar.monitor
-                Layout.maximumWidth: Math.max(0, pill.width / 2 - clock.width / 2 - ws.width - 28)
-            }
+            width: implicitWidth
+            monitor: bar.monitor
         }
-
+        ActiveWindow {
+            id: title
+            x: ws.x + ws.width + Theme.spacing
+            anchors.verticalCenter: parent.verticalCenter
+            width: implicitWidth
+            clip: true
+            monitor: bar.monitor
+            maxWidth: Math.max(0, Math.min(420, clock.x - bar.clockGap - x))
+        }
         Clock {
             id: clock
             anchors.centerIn: parent
             screenName: bar.scr.name
         }
-
         RowLayout {
+            id: rightRow
             anchors.right: parent.right
-            anchors.rightMargin: 5
+            anchors.rightMargin: bar.inset
             anchors.verticalCenter: parent.verticalCenter
-            spacing: 4
+            spacing: Theme.spacing
             MediaChip {
+                id: media
                 screenName: bar.scr.name
-                Layout.maximumWidth: Math.max(0, pill.width / 2 - clock.width / 2 - 260)
+                maxWidth: pill.width - bar.inset - clock.x - clock.width - bar.clockGap
+                          - (tray.visible ? tray.implicitWidth + rightRow.spacing : 0)
+                          - status.implicitWidth - rightRow.spacing
             }
             Tray {
+                id: tray
                 screenName: bar.scr.name
             }
             Status {
+                id: status
                 screenName: bar.scr.name
             }
         }

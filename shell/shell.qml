@@ -43,9 +43,11 @@ ShellRoot {
                 scr: scope.modelData
             }
 
-            Slot {
-                want: (Ui.panel === "control" && Ui.screen === scope.sn)
-                ControlCenter { scr: scope.modelData; barWin: bar }
+            // the control centre is built once in the background and kept, so
+            // opening it never has to construct anything mid-animation
+            LazyLoader {
+                loading: true
+                ControlCenter { scr: scope.modelData; barWin: bar; persistent: true }
             }
             Slot {
                 want: (Ui.panel === "calendar" && Ui.screen === scope.sn)
@@ -76,12 +78,24 @@ ShellRoot {
                 want: (Ui.overlay === "wallpapers" && Ui.screen === scope.sn)
                 WallpaperPicker { scr: scope.modelData }
             }
+            Slot {
+                want: (Ui.overlay === "help" && Ui.screen === scope.sn)
+                Help { scr: scope.modelData }
+            }
+            Slot {
+                want: (Ui.overlay === "welcome" && Ui.screen === scope.sn)
+                Welcome { scr: scope.modelData }
+            }
         }
     }
 
     Slot {
         want: Notifs.toasts.count > 0
         Toasts {}
+    }
+    LazyLoader {
+        active: Ui.settings
+        Settings {}
     }
     Osd {}
     Lock { id: locker }
@@ -92,6 +106,19 @@ ShellRoot {
     Component.onCompleted: {
         Wallpaper.available;
         Hypr.lua;
+    }
+    // first run: show the welcome guide once the settings file has been read
+    Connections {
+        target: Config
+        function onReadyChanged() {
+            if (Config.ready && !Config.opt.welcomed)
+                welcomeDelay.start();
+        }
+    }
+    Timer {
+        id: welcomeDelay
+        interval: 1500
+        onTriggered: if (!Config.opt.welcomed) Ui.showWelcome()
     }
 
     // ── keybinds (Hyprland: hl.dsp.global("quartz:<name>")) ──
@@ -104,7 +131,8 @@ ShellRoot {
     GlobalShortcut { appid: "quartz"; name: "wifi"; description: "Wi-Fi"; onPressed: Ui.togglePanel("control", "", "wifi") }
     GlobalShortcut { appid: "quartz"; name: "bluetooth"; description: "Bluetooth"; onPressed: Ui.togglePanel("control", "", "bluetooth") }
     GlobalShortcut { appid: "quartz"; name: "sound"; description: "Sound devices + mixer"; onPressed: Ui.togglePanel("control", "", "audio") }
-    GlobalShortcut { appid: "quartz"; name: "settings"; description: "quartz settings"; onPressed: Ui.togglePanel("control", "", "settings") }
+    GlobalShortcut { appid: "quartz"; name: "settings"; description: "quartz settings"; onPressed: Ui.openSettings() }
+    GlobalShortcut { appid: "quartz"; name: "help"; description: "Keyboard shortcuts"; onPressed: Ui.toggleOverlay("help") }
     GlobalShortcut { appid: "quartz"; name: "calendar"; description: "Calendar"; onPressed: Ui.togglePanel("calendar") }
     GlobalShortcut { appid: "quartz"; name: "media"; description: "Now playing"; onPressed: Ui.togglePanel("media") }
     GlobalShortcut { appid: "quartz"; name: "mediaToggle"; description: "Play / pause"; onPressed: Media.toggle() }
@@ -120,7 +148,7 @@ ShellRoot {
         function wallpapers(): void { Ui.toggleOverlay("wallpapers"); }
         function randomWallpaper(): void { Wallpaper.random(); }
         function setWallpaper(path: string): void { Wallpaper.set(path); }
-        // name: control | calendar | media, or control:<page> (wifi, bluetooth, audio, settings)
+        // name: control | calendar | media, or control:<page> (wifi, bluetooth, audio)
         function panel(name: string): void {
             const parts = name.split(":");
             Ui.togglePanel(parts[0], "", parts[1] || "main");
@@ -130,6 +158,9 @@ ShellRoot {
         function mic(): void { Audio.toggleMic(); }
         function dnd(): void { Config.opt.dnd = !Config.opt.dnd; }
         function lock(): void { locker.lockNow(); }
+        function settings(): void { Ui.openSettings(); }
+        function help(): void { Ui.toggleOverlay("help"); }
+        function welcome(): void { Ui.showWelcome(); }
         function close(): void { Ui.closeAll(); }
     }
 }

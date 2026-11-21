@@ -17,6 +17,7 @@ Scope {
         root.kind = k;
         root.show = true;
         root.lingering = true;
+        gone.stop();
         hideTimer.restart();
     }
     Connections {
@@ -30,7 +31,16 @@ Scope {
     Timer {
         id: hideTimer
         interval: 1500
-        onTriggered: root.show = false
+        onTriggered: {
+            root.show = false;
+            gone.restart();
+        }
+    }
+    // destroyed only after the exit animation has played
+    Timer {
+        id: gone
+        interval: Anim.normal + 120
+        onTriggered: root.lingering = false
     }
 
     LazyLoader {
@@ -57,20 +67,19 @@ Scope {
                 id: pill
                 anchors.horizontalCenter: parent.horizontalCenter
                 y: 20 + (win.shown ? 0 : 24)
-                width: 280
-                height: 56
-                radius: 28
+                width: 300
+                height: Theme.tile - 8
+                radius: Theme.pill(height)
                 opacity: win.shown ? 1 : 0
-                scale: win.shown ? 1 : 0.9
-                Behavior on y { Spring { spring: 3.8; damping: 0.4 } }
-                Behavior on scale { Spring { spring: 3.8; damping: 0.4; epsilon: 0.003 } }
+                scale: win.shown ? 1 : 0.94
+                Behavior on y { Ease { duration: win.shown ? Anim.slow : Anim.normal; easing.bezierCurve: win.shown ? Anim.decel : Anim.accel } }
+                Behavior on scale { Ease { duration: win.shown ? Anim.slow : Anim.normal; easing.bezierCurve: win.shown ? Anim.decel : Anim.accel } }
                 Behavior on opacity { Ease { duration: win.shown ? Anim.fast : Anim.normal } }
-                onOpacityChanged: if (!win.shown && opacity < 0.02) root.lingering = false
 
                 RowLayout {
                     anchors.fill: parent
-                    anchors.leftMargin: 18
-                    anchors.rightMargin: 20
+                    anchors.leftMargin: 20
+                    anchors.rightMargin: 22
                     spacing: 14
                     Icon {
                         icon: win.icon
@@ -81,12 +90,12 @@ Scope {
                     Rectangle {
                         Layout.fillWidth: true
                         implicitHeight: 8
-                        radius: 4
+                        radius: Theme.pill(height)
                         color: Theme.alpha(Theme.text, 0.12)
                         Rectangle {
                             height: parent.height
-                            radius: 4
-                            width: parent.width * Math.min(1, win.value)
+                            radius: Theme.pill(height)
+                            width: Math.max(height, parent.width * Math.min(1, win.value))
                             color: win.value > 1 ? Theme.error : Theme.primary
                             Behavior on width { Ease { duration: Anim.fast } }
                         }

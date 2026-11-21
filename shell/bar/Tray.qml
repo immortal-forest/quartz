@@ -19,9 +19,9 @@ RowLayout {
             id: cell
             required property SystemTrayItem modelData
             readonly property bool menuOpen: Ui.panel === "tray" && Ui.trayItem === modelData && Ui.screen === root.screenName
-            implicitWidth: 28
-            implicitHeight: 28
-            radius: 9
+            implicitWidth: Theme.barItem
+            implicitHeight: Theme.barItem
+            radius: Theme.rBarItem
             color: menuOpen ? Theme.alpha(Theme.primary, 0.16) : "transparent"
 
             function openMenu() {
@@ -34,7 +34,7 @@ RowLayout {
 
             IconImage {
                 anchors.centerIn: parent
-                implicitSize: 16
+                implicitSize: Theme.iconBar
                 source: cell.modelData.icon
                 asynchronous: true
             }

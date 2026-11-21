@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Widgets
+import Quickshell.Io
 import Quickshell.Bluetooth
 import Quickshell.Services.UPower
 import "../core"
@@ -10,13 +11,29 @@ import "../widgets"
 import "../bar"
 
 // The control centre: quick settings + notifications on one sheet, with
-// pages for Wi-Fi, Bluetooth, sound devices and quartz's own settings.
+// pages for Wi-Fi, Bluetooth and sound devices (settings live in their own window).
 PanelWin {
     id: win
     name: "control"
     side: "right"
-    cardWidth: 404
+    cardWidth: 480
     contentHeight: stack.height
+
+    // the whole sheet stays within ~80 % of the space under the bar; the
+    // notification list gets what's left and scrolls inside it
+    readonly property real maxSheet: Math.round(((scr?.height ?? 1000) - Theme.barHeight - Theme.gap) * 0.8)
+
+    property string uptime: ""
+    FileView {
+        id: up
+        path: "/proc/uptime"
+        onLoaded: {
+            const m = Math.floor(parseFloat(text()) / 60);
+            win.uptime = m >= 60 ? Math.floor(m / 60) + " h " + (m % 60) + " min" : m + " min";
+        }
+    }
+    onWantChanged: if (want) up.reload()
+    Component.onCompleted: up.reload()
 
     component PageHeader: RowLayout {
         id: ph
@@ -25,10 +42,10 @@ PanelWin {
         property bool checked: false
         signal toggled
         Layout.fillWidth: true
-        spacing: 8
+        Layout.bottomMargin: 4
+        spacing: 12
         IconBtn {
             icon: "arrow_back"
-            size: 36
             onClicked: Ui.page = "main"
         }
         T {
@@ -45,126 +62,124 @@ PanelWin {
         }
     }
 
-    component Row2: Rectangle {
-        id: r2
+    // One list row (Wi-Fi network, Bluetooth device, sound device, setting):
+    // a 40 px icon disc, title + subtitle, a trailing glyph / spinner / switch.
+    // Rows with `extra` children expand into a card holding them.
+    component ListRow: Rectangle {
+        id: lr
         property string icon: ""
         property string title: ""
         property string subtitle: ""
         property bool active: false
         property bool expanded: false
         property bool busy: false
+        property string trailing: ""
+        property bool hasSwitch: false
+        property bool checked: false
         default property alias extra: extraCol.data
         signal clicked
+        readonly property real inset: (Theme.row - Theme.ctl) / 2
         Layout.fillWidth: true
-        implicitHeight: head.implicitHeight + (expanded ? extraCol.implicitHeight + 10 : 0) + 16
-        radius: 16
+        implicitHeight: Theme.row + (expanded ? extraCol.implicitHeight + Theme.padCard : 0)
+        radius: Theme.rCard
         color: expanded ? Theme.card : "transparent"
         clip: true
         Behavior on implicitHeight { Ease { duration: Anim.slow; easing.bezierCurve: Anim.emphasized } }
         Behavior on color { CAnim {} }
+        StateLayer {
+            anchors.fill: undefined
+            width: parent.width
+            height: Theme.row
+            radius: Theme.rCard
+            onClicked: lr.clicked()
+        }
         RowLayout {
-            id: head
-            x: 10
-            y: 8
-            width: parent.width - 20
+            x: lr.inset
+            width: parent.width - lr.inset * 2
+            height: Theme.row
             spacing: 12
             Rectangle {
-                implicitWidth: 36
-                implicitHeight: 36
-                radius: 18
-                color: r2.active ? Theme.primary : Theme.alpha(Theme.text, 0.07)
+                implicitWidth: Theme.ctl
+                implicitHeight: Theme.ctl
+                radius: Theme.pill(height)
+                color: lr.active ? Theme.primary : Theme.tonal
                 Behavior on color { CAnim {} }
                 Icon {
                     anchors.centerIn: parent
-                    icon: r2.icon
-                    size: 19
-                    fill: r2.active ? 1 : 0
-                    color: r2.active ? Theme.primaryText : Theme.text
+                    icon: lr.icon
+                    fill: lr.active ? 1 : 0
+                    color: lr.active ? Theme.primaryText : Theme.text
                 }
             }
             ColumnLayout {
                 Layout.fillWidth: true
-                spacing: 0
+                spacing: 1
                 T {
                     Layout.fillWidth: true
-                    text: r2.title
-                    font.weight: r2.active ? Font.DemiBold : Font.Normal
+                    text: lr.title
+                    font.weight: lr.active ? Font.DemiBold : Font.Medium
                 }
                 T {
                     Layout.fillWidth: true
                     visible: text.length > 0
-                    text: r2.subtitle
+                    text: lr.subtitle
                     font.pixelSize: Theme.fsSmall
-                    color: r2.active ? Theme.primary : Theme.textDim
+                    color: lr.active ? Theme.primary : Theme.textDim
+                    wrapMode: Text.Wrap
+                    maximumLineCount: 2
                 }
             }
             Icon {
-                visible: r2.busy
+                visible: lr.busy
                 icon: "progress_activity"
-                size: 18
                 color: Theme.primary
                 RotationAnimator on rotation {
-                    running: r2.busy
+                    running: lr.busy
                     from: 0
                     to: 360
                     duration: 900
                     loops: Animation.Infinite
                 }
             }
-        }
-        StateLayer {
-            height: head.implicitHeight + 16
-            anchors.fill: undefined
-            width: parent.width
-            radius: 16
-            onClicked: r2.clicked()
+            Icon {
+                visible: !lr.busy && lr.trailing.length > 0
+                // ink at the row's inset, mirroring the icon disc on the left
+                tight: true
+                Layout.rightMargin: 4
+                icon: lr.trailing
+                size: 18
+                color: lr.active ? Theme.primary : Theme.textDim
+            }
+            Switch {
+                visible: lr.hasSwitch
+                checked: lr.checked
+                onToggled: lr.clicked()
+            }
         }
         ColumnLayout {
             id: extraCol
-            x: 58
-            y: head.implicitHeight + 16
-            width: parent.width - 68
-            spacing: 8
-            opacity: r2.expanded ? 1 : 0
+            x: lr.inset + Theme.ctl + 12
+            y: Theme.row
+            width: parent.width - x - Theme.padCard
+            spacing: Theme.spacing
+            opacity: lr.expanded ? 1 : 0
             Behavior on opacity { Ease {} }
-        }
-    }
-
-    component PillBtn: Rectangle {
-        id: pb
-        property string text: ""
-        property bool filled: true
-        signal clicked
-        implicitHeight: 32
-        implicitWidth: lbl.implicitWidth + 28
-        radius: 16
-        color: filled ? Theme.primary : Theme.alpha(Theme.text, 0.08)
-        T {
-            id: lbl
-            anchors.centerIn: parent
-            text: pb.text
-            font.weight: Font.DemiBold
-            color: pb.filled ? Theme.primaryText : Theme.text
-        }
-        StateLayer {
-            tint: pb.filled ? Theme.primaryText : Theme.text
-            onClicked: pb.clicked()
         }
     }
 
     Item {
         id: stack
         width: parent.width
-        height: (Ui.page === "wifi" ? wifiPage : Ui.page === "bluetooth" ? btPage : Ui.page === "audio" ? audioPage : Ui.page === "settings" ? settingsPage : mainPage).implicitHeight + 32
+        height: (Ui.page === "wifi" ? wifiPage : Ui.page === "bluetooth" ? btPage : Ui.page === "audio" ? audioPage : mainPage).implicitHeight + Theme.pad * 2
 
         // Shared-axis: the main sheet slides left as a page comes in from the right.
         component Page: ColumnLayout {
             id: pg
             property string key: "main"
             readonly property bool current: Ui.page === key
-            x: 16 + (current ? 0 : (key === "main" ? -36 : 36))
-            y: 16
-            width: stack.width - 32
+            x: Theme.pad + (current ? 0 : (key === "main" ? -36 : 36))
+            y: Theme.pad
+            width: stack.width - Theme.pad * 2
             spacing: 12
             opacity: current ? 1 : 0
             visible: opacity > 0.01
@@ -179,39 +194,45 @@ PanelWin {
 
             RowLayout {
                 Layout.fillWidth: true
-                spacing: 6
+                Layout.bottomMargin: 4
+                spacing: Theme.spacing
+                Rectangle {
+                    implicitWidth: Theme.ctl
+                    implicitHeight: Theme.ctl
+                    radius: Theme.pill(height)
+                    color: Theme.alpha(Theme.primary, 0.18)
+                    T {
+                        anchors.centerIn: parent
+                        text: (Quickshell.env("USER") || "?").charAt(0).toUpperCase()
+                        font.pixelSize: Theme.fsTitle
+                        font.weight: Font.DemiBold
+                        color: Theme.primary
+                    }
+                }
                 ColumnLayout {
                     Layout.fillWidth: true
+                    Layout.leftMargin: 4
                     spacing: 0
                     T {
-                        text: Qt.formatDateTime(Notifs.now, "dddd")
-                        font.family: Theme.display
-                        font.pixelSize: Theme.fsLarge
-                        font.weight: Font.Medium
+                        Layout.fillWidth: true
+                        text: Quickshell.env("USER") || ""
+                        font.pixelSize: Theme.fsTitle
+                        font.weight: Font.DemiBold
                     }
                     T {
+                        Layout.fillWidth: true
                         readonly property var dev: UPower.displayDevice
                         readonly property bool bat: dev?.isLaptopBattery ?? false
                         readonly property real secs: UPower.onBattery ? (dev?.timeToEmpty ?? 0) : (dev?.timeToFull ?? 0)
-                        text: Qt.formatDateTime(Notifs.now, "d MMMM") + (bat && secs > 0 ? "  ·  " + Math.floor(secs / 3600) + " h " + Math.round(secs % 3600 / 60) + " min " + (UPower.onBattery ? "left" : "to full") : "")
+                        readonly property string batText: !bat ? "" : secs > 0 ? Math.floor(secs / 3600) + " h " + Math.round(secs % 3600 / 60) + " min " + (UPower.onBattery ? "left" : "to full") : ""
+                        text: ["Up " + win.uptime, batText].filter(x => x.length).join("  ·  ")
                         color: Theme.textDim
                         font.pixelSize: Theme.fsSmall
                     }
                 }
                 IconBtn {
-                    icon: "screenshot_region"
-                    onClicked: {
-                        Ui.closeAll();
-                        Quickshell.execDetached(["sh", "-c", "sleep 0.35; hyprshot -m region"]);
-                    }
-                }
-                IconBtn {
-                    icon: "wallpaper"
-                    onClicked: Ui.toggleOverlay("wallpapers")
-                }
-                IconBtn {
                     icon: "settings"
-                    onClicked: Ui.page = "settings"
+                    onClicked: Ui.openSettings()
                 }
                 IconBtn {
                     icon: "power_settings_new"
@@ -225,7 +246,6 @@ PanelWin {
                 Layout.fillWidth: true
                 icon: Audio.muted ? "volume_off" : "volume_up"
                 value: Audio.muted ? 0 : Audio.volume
-                showValue: true
                 onMoved: v => Audio.setVolume(v)
                 onIconClicked: Audio.toggleMute()
             }
@@ -234,15 +254,16 @@ PanelWin {
                 visible: Brightness.available
                 icon: Brightness.icon
                 value: Brightness.value
-                showValue: true
                 onMoved: v => Brightness.set(v)
             }
 
             GridLayout {
                 Layout.fillWidth: true
+                Layout.topMargin: 4
                 columns: 2
-                columnSpacing: 8
-                rowSpacing: 8
+                columnSpacing: Theme.spacing
+                rowSpacing: Theme.spacing
+                uniformCellWidths: true
                 Tile {
                     Layout.fillWidth: true
                     icon: Net.wiredUp ? "lan" : Net.wifiOn ? "wifi" : "wifi_off"
@@ -266,13 +287,20 @@ PanelWin {
                 }
                 Tile {
                     Layout.fillWidth: true
+                    icon: "speaker"
+                    title: "Sound"
+                    subtitle: Audio.shortName(Audio.sink)
+                    more: true
+                    onToggled: Ui.page = "audio"
+                    onOpened: Ui.page = "audio"
+                }
+                Tile {
+                    Layout.fillWidth: true
                     icon: Audio.micMuted ? "mic_off" : "mic"
                     title: "Microphone"
                     subtitle: Audio.micMuted ? "Muted" : "On"
                     active: !Audio.micMuted
-                    more: true
                     onToggled: Audio.toggleMic()
-                    onOpened: Ui.page = "audio"
                 }
                 Tile {
                     Layout.fillWidth: true
@@ -286,92 +314,129 @@ PanelWin {
                     Layout.fillWidth: true
                     icon: "coffee"
                     title: "Stay awake"
-                    subtitle: Config.opt.caffeine ? "Screen stays on" : "Off"
+                    subtitle: Config.opt.caffeine ? "On" : "Off"
                     active: Config.opt.caffeine
                     onToggled: Config.opt.caffeine = !Config.opt.caffeine
                 }
-                Tile {
+            }
+
+            // quick actions: labelled, one slim row instead of a row of tiles
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: Theme.spacing
+                Button {
                     Layout.fillWidth: true
-                    icon: "speaker"
-                    title: "Sound"
-                    subtitle: Audio.name(Audio.sink)
-                    more: true
-                    onToggled: Ui.page = "audio"
-                    onOpened: Ui.page = "audio"
+                    filled: false
+                    icon: "screenshot_region"
+                    text: "Screenshot"
+                    onClicked: {
+                        Ui.closeAll();
+                        Quickshell.execDetached(["sh", "-c", "sleep 0.35; hyprshot -m region"]);
+                    }
+                }
+                Button {
+                    Layout.fillWidth: true
+                    filled: false
+                    icon: "wallpaper"
+                    text: "Wallpaper"
+                    onClicked: Ui.toggleOverlay("wallpapers")
                 }
             }
 
             MediaCard {
                 Layout.fillWidth: true
+                live: win.shown
                 visible: Media.hasTrack
             }
 
             RowLayout {
                 Layout.fillWidth: true
                 Layout.topMargin: 4
-                T {
+                spacing: Theme.spacing
+                Section {
                     Layout.fillWidth: true
-                    text: "Notifications"
-                    font.weight: Font.DemiBold
-                    color: Theme.textDim
+                    text: Notifs.count > 0 ? "Notifications · " + Notifs.count : "Notifications"
                 }
-                T {
+                Button {
                     visible: Notifs.count > 0
+                    small: true
+                    filled: false
+                    icon: "clear_all"
                     text: "Clear all"
-                    font.weight: Font.DemiBold
-                    color: Theme.primary
-                    MouseArea {
-                        anchors.fill: parent
-                        anchors.margins: -6
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: Notifs.clearAll()
-                    }
+                    onClicked: Notifs.clearAll()
                 }
             }
             Item {
+                id: notifArea
                 Layout.fillWidth: true
-                implicitHeight: Notifs.count === 0 ? 72 : Math.min(list.contentHeight, 340)
-                Behavior on implicitHeight { Ease { duration: Anim.slow; easing.bezierCurve: Anim.emphasized } }
-                ColumnLayout {
-                    anchors.centerIn: parent
+                // y = everything above it, so this never depends on its own height
+                readonly property real room: Math.max(Theme.row * 2, win.maxSheet - Theme.pad * 2 - y)
+                implicitHeight: Notifs.count === 0 ? Theme.row : Math.min(notifCol.implicitHeight, room)
+                Behavior on implicitHeight { enabled: win.settled; Ease { duration: Anim.slow; easing.bezierCurve: Anim.emphasized } }
+                Rectangle {
+                    anchors.fill: parent
                     visible: Notifs.count === 0
-                    spacing: 4
-                    Icon {
-                        Layout.alignment: Qt.AlignHCenter
-                        icon: "notifications_paused"
-                        size: 26
-                        color: Theme.textDim
-                    }
-                    T {
-                        text: "You're all caught up"
-                        color: Theme.textDim
+                    radius: Theme.rCard
+                    color: Theme.card
+                    RowLayout {
+                        anchors.centerIn: parent
+                        spacing: 10
+                        Icon {
+                            icon: "done_all"
+                            color: Theme.textDim
+                        }
+                        T {
+                            text: "No notifications"
+                            color: Theme.textDim
+                        }
                     }
                 }
-                ListView {
-                    id: list
+                // a Column in a Flickable (not a ListView): the cards change height
+                // after they appear, and a ListView under-measured them and cut
+                // the last one's buttons with a straight edge
+                Flickable {
+                    id: notifFlick
                     anchors.fill: parent
+                    visible: Notifs.count > 0
                     clip: true
-                    spacing: 8
-                    model: Notifs.history
+                    contentHeight: notifCol.implicitHeight
                     boundsBehavior: Flickable.StopAtBounds
-                    delegate: NotifCard {
-                        required property int nid
-                        width: list.width
-                    }
-                    add: Transition {
-                        ParallelAnimation {
-                            NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Anim.normal }
-                            NumberAnimation { property: "scale"; from: 0.95; to: 1; duration: Anim.slow; easing.type: Easing.OutBack }
+                    Column {
+                        id: notifCol
+                        width: notifFlick.width
+                        spacing: Theme.spacing
+                        move: Transition {
+                            NumberAnimation { properties: "y"; duration: Anim.slow; easing.type: Easing.BezierSpline; easing.bezierCurve: Anim.emphasized }
+                        }
+                        Repeater {
+                            model: Notifs.history
+                            delegate: NotifCard {
+                                width: notifCol.width
+                            }
                         }
                     }
-                    displaced: Transition {
-                        NumberAnimation { property: "y"; duration: Anim.slow; easing.type: Easing.BezierSpline; easing.bezierCurve: Anim.emphasized }
+                }
+                // soft haze where the list scrolls on past the edge (as in the launcher)
+                Rectangle {
+                    anchors { left: parent.left; right: parent.right; top: parent.top }
+                    height: 28
+                    visible: Notifs.count > 0
+                    opacity: notifFlick.contentY > 1 ? 1 : 0
+                    Behavior on opacity { Ease { duration: Anim.fast } }
+                    gradient: Gradient {
+                        GradientStop { position: 0; color: win.card.color }
+                        GradientStop { position: 1; color: Theme.alpha(win.card.color, 0) }
                     }
-                    remove: Transition {
-                        ParallelAnimation {
-                            NumberAnimation { property: "opacity"; to: 0; duration: Anim.fast }
-                            NumberAnimation { property: "x"; to: 60; duration: Anim.normal; easing.type: Easing.BezierSpline; easing.bezierCurve: Anim.accel }
-                        }
+                }
+                Rectangle {
+                    anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
+                    height: 40
+                    visible: Notifs.count > 0
+                    opacity: notifFlick.contentHeight > notifFlick.height + 1 && !notifFlick.atYEnd ? 1 : 0
+                    Behavior on opacity { Ease { duration: Anim.fast } }
+                    gradient: Gradient {
+                        GradientStop { position: 0; color: Theme.alpha(win.card.color, 0) }
+                        GradientStop { position: 1; color: win.card.color }
                     }
                 }
             }
@@ -392,20 +457,30 @@ PanelWin {
             Rectangle {
                 Layout.fillWidth: true
                 visible: Net.wiredUp
-                implicitHeight: 44
-                radius: 14
+                implicitHeight: Theme.ctl + 8
+                radius: Theme.rCard
                 color: Theme.alpha(Theme.primary, 0.12)
                 RowLayout {
                     anchors.fill: parent
-                    anchors.leftMargin: 14
-                    spacing: 10
+                    anchors.leftMargin: Theme.padCard + 4
+                    spacing: 12
                     Icon { icon: "lan"; fill: 1; color: Theme.primary }
                     T { text: "Connected over Ethernet"; color: Theme.primary; font.weight: Font.Medium }
                 }
             }
+            T {
+                visible: !Net.wifiOn
+                Layout.alignment: Qt.AlignHCenter
+                Layout.topMargin: 12
+                Layout.bottomMargin: 12
+                text: "Wi-Fi is off"
+                color: Theme.textDim
+            }
             Flickable {
                 Layout.fillWidth: true
-                implicitHeight: Math.min(netCol.implicitHeight, 420)
+                Layout.leftMargin: -(Theme.row - Theme.ctl) / 2
+                Layout.rightMargin: -(Theme.row - Theme.ctl) / 2
+                implicitHeight: Math.min(netCol.implicitHeight, 448)
                 contentHeight: netCol.implicitHeight
                 clip: true
                 boundsBehavior: Flickable.StopAtBounds
@@ -415,8 +490,8 @@ PanelWin {
                     width: parent.width
                     spacing: 2
                     Repeater {
-                        model: Net.networks
-                        delegate: Row2 {
+                        model: wifiPage.current ? Net.networks : []   // built only while the page is open
+                        delegate: ListRow {
                             id: nr
                             required property var modelData
                             property string err: ""
@@ -426,6 +501,7 @@ PanelWin {
                             subtitle: err.length ? err : modelData.connected ? "Connected" : modelData.stateChanging ? "Connecting…" : modelData.known ? "Saved" : locked ? "Secured" : "Open"
                             active: modelData.connected
                             busy: modelData.stateChanging
+                            trailing: modelData.connected ? "check" : locked ? "lock" : ""
                             onClicked: {
                                 if (!modelData.connected && (modelData.known || !locked)) {
                                     err = "";
@@ -433,7 +509,7 @@ PanelWin {
                                 } else {
                                     expanded = !expanded;
                                     if (expanded && !modelData.connected)
-                                        pw.forceActiveFocus();
+                                        pw.input.forceActiveFocus();
                                 }
                             }
                             Connections {
@@ -444,54 +520,37 @@ PanelWin {
                                 }
                                 function onConnectedChanged() { if (nr.modelData.connected) { nr.err = ""; nr.expanded = false; } }
                             }
-                            Rectangle {
+                            Field {
+                                id: pw
                                 visible: !nr.modelData.connected && nr.locked
                                 Layout.fillWidth: true
-                                implicitHeight: 38
-                                radius: 12
-                                color: Theme.alpha(Theme.text, 0.07)
-                                border.width: pw.activeFocus ? 2 : 0
-                                border.color: Theme.primary
-                                TextInput {
-                                    id: pw
-                                    anchors.fill: parent
-                                    anchors.leftMargin: 12
-                                    anchors.rightMargin: 12
-                                    verticalAlignment: TextInput.AlignVCenter
-                                    echoMode: TextInput.Password
-                                    color: Theme.text
-                                    font.family: Theme.font
-                                    font.pixelSize: Theme.fsBody
-                                    selectionColor: Theme.primary
-                                    clip: true
-                                    onAccepted: connectBtn.clicked()
-                                    T {
-                                        visible: !pw.text.length
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        text: "Password"
-                                        color: Theme.textDim
-                                    }
-                                }
+                                icon: "key"
+                                placeholder: "Password"
+                                password: true
+                                onAccepted: connectBtn.clicked()
                             }
                             RowLayout {
                                 Layout.fillWidth: true
-                                spacing: 6
+                                spacing: Theme.spacing
                                 Item { Layout.fillWidth: true }
-                                PillBtn {
+                                Button {
                                     visible: nr.modelData.known
+                                    small: true
                                     text: "Forget"
                                     filled: false
                                     onClicked: { nr.modelData.forget(); nr.expanded = false; }
                                 }
-                                PillBtn {
+                                Button {
                                     visible: nr.modelData.connected
+                                    small: true
                                     text: "Disconnect"
                                     filled: false
                                     onClicked: { nr.modelData.disconnect(); nr.expanded = false; }
                                 }
-                                PillBtn {
+                                Button {
                                     id: connectBtn
                                     visible: !nr.modelData.connected
+                                    small: true
                                     text: "Connect"
                                     onClicked: {
                                         nr.err = "";
@@ -528,9 +587,19 @@ PanelWin {
                 checked: Bt.on
                 onToggled: Bt.setOn(!Bt.on)
             }
+            T {
+                visible: !Bt.on
+                Layout.alignment: Qt.AlignHCenter
+                Layout.topMargin: 12
+                Layout.bottomMargin: 12
+                text: "Bluetooth is off"
+                color: Theme.textDim
+            }
             Flickable {
                 Layout.fillWidth: true
-                implicitHeight: Math.min(btCol.implicitHeight, 420)
+                Layout.leftMargin: -(Theme.row - Theme.ctl) / 2
+                Layout.rightMargin: -(Theme.row - Theme.ctl) / 2
+                implicitHeight: Math.min(btCol.implicitHeight, 448)
                 contentHeight: btCol.implicitHeight
                 clip: true
                 boundsBehavior: Flickable.StopAtBounds
@@ -540,17 +609,18 @@ PanelWin {
                     width: parent.width
                     spacing: 2
                     Repeater {
-                        model: Bt.devices
-                        delegate: Row2 {
+                        model: btPage.current ? Bt.devices : []
+                        delegate: ListRow {
                             id: br
                             required property var modelData
                             property bool wantConnect: false
                             readonly property bool changing: modelData.state === BluetoothDeviceState.Connecting || modelData.state === BluetoothDeviceState.Disconnecting || modelData.pairing
                             icon: Bt.deviceIcon(modelData)
                             title: modelData.name
-                            subtitle: modelData.connected ? ("Connected" + (modelData.batteryAvailable ? " · " + Math.round(modelData.battery * (modelData.battery > 1 ? 1 : 100)) + "%" : "")) : modelData.pairing ? "Pairing…" : changing ? "Connecting…" : modelData.paired ? "Paired" : ""
+                            subtitle: modelData.connected ? ("Connected" + (modelData.batteryAvailable ? " · " + Math.round(modelData.battery * (modelData.battery > 1 ? 1 : 100)) + "%" : "")) : modelData.pairing ? "Pairing…" : changing ? "Connecting…" : modelData.paired ? "Paired · tap to connect" : "Tap to pair"
                             active: modelData.connected
                             busy: changing
+                            trailing: modelData.connected ? "expand_more" : ""
                             onClicked: {
                                 if (modelData.connected)
                                     expanded = !expanded;
@@ -573,14 +643,16 @@ PanelWin {
                             }
                             RowLayout {
                                 Layout.fillWidth: true
-                                spacing: 6
+                                spacing: Theme.spacing
                                 Item { Layout.fillWidth: true }
-                                PillBtn {
+                                Button {
+                                    small: true
                                     text: "Forget"
                                     filled: false
                                     onClicked: { br.modelData.forget(); br.expanded = false; }
                                 }
-                                PillBtn {
+                                Button {
+                                    small: true
                                     text: "Disconnect"
                                     onClicked: { br.modelData.disconnect(); br.expanded = false; }
                                 }
@@ -605,53 +677,72 @@ PanelWin {
             key: "audio"
 
             PageHeader { title: "Sound" }
-            T { text: "Output"; font.weight: Font.DemiBold; color: Theme.textDim }
-            Repeater {
-                model: Audio.sinks
-                delegate: Row2 {
-                    required property var modelData
-                    icon: modelData.name.indexOf("bluez") >= 0 ? "headphones" : modelData.name.indexOf("hdmi") >= 0 ? "tv" : "speaker"
-                    title: Audio.name(modelData)
-                    active: modelData === Audio.sink
-                    onClicked: Audio.useSink(modelData)
+            Section { text: "Output" }
+            QSlider {
+                Layout.fillWidth: true
+                icon: Audio.muted ? "volume_off" : "volume_up"
+                value: Audio.muted ? 0 : Audio.volume
+                onMoved: v => Audio.setVolume(v)
+                onIconClicked: Audio.toggleMute()
+            }
+            ColumnLayout {
+                Layout.fillWidth: true
+                Layout.leftMargin: -(Theme.row - Theme.ctl) / 2
+                Layout.rightMargin: -(Theme.row - Theme.ctl) / 2
+                spacing: 2
+                Repeater {
+                    model: audioPage.current ? Audio.sinks : []
+                    delegate: ListRow {
+                        required property var modelData
+                        icon: modelData.name.indexOf("bluez") >= 0 ? "headphones" : modelData.name.indexOf("hdmi") >= 0 ? "tv" : "speaker"
+                        title: Audio.name(modelData)
+                        active: modelData === Audio.sink
+                        trailing: active ? "check" : ""
+                        onClicked: Audio.useSink(modelData)
+                    }
                 }
             }
-            T { text: "Input"; font.weight: Font.DemiBold; color: Theme.textDim; Layout.topMargin: 4 }
+            Section { text: "Input"; Layout.topMargin: 4 }
             QSlider {
                 Layout.fillWidth: true
                 icon: Audio.micIcon
                 value: Audio.micMuted ? 0 : Audio.micVolume
-                showValue: true
                 onMoved: v => Audio.setMic(v)
                 onIconClicked: Audio.toggleMic()
             }
-            Repeater {
-                model: Audio.sources.length > 1 ? Audio.sources : []
-                delegate: Row2 {
-                    required property var modelData
-                    icon: "mic"
-                    title: Audio.name(modelData)
-                    active: modelData === Audio.source
-                    onClicked: Audio.useSource(modelData)
+            ColumnLayout {
+                Layout.fillWidth: true
+                Layout.leftMargin: -(Theme.row - Theme.ctl) / 2
+                Layout.rightMargin: -(Theme.row - Theme.ctl) / 2
+                visible: Audio.sources.length > 1
+                spacing: 2
+                Repeater {
+                    model: audioPage.current && Audio.sources.length > 1 ? Audio.sources : []
+                    delegate: ListRow {
+                        required property var modelData
+                        icon: "mic"
+                        title: Audio.name(modelData)
+                        active: modelData === Audio.source
+                        trailing: active ? "check" : ""
+                        onClicked: Audio.useSource(modelData)
+                    }
                 }
             }
-            T {
+            Section {
                 visible: Audio.streams.length > 0
                 text: "Apps"
-                font.weight: Font.DemiBold
-                color: Theme.textDim
                 Layout.topMargin: 4
             }
             Repeater {
-                model: Audio.streams
+                model: audioPage.current ? Audio.streams : []
                 delegate: RowLayout {
                     id: sr
                     required property var modelData
                     readonly property string app: modelData.properties["application.name"] ?? modelData.description ?? modelData.name
                     Layout.fillWidth: true
-                    spacing: 10
+                    spacing: 12
                     AppIcon {
-                        size: 26
+                        size: Theme.ctl
                         name: sr.modelData.properties["application.icon-name"] ?? (sr.app ?? "")
                         glyph: "music_note"
                     }
@@ -661,7 +752,7 @@ PanelWin {
                         T { text: sr.app; font.pixelSize: Theme.fsSmall; color: Theme.textDim; Layout.fillWidth: true }
                         QSlider {
                             Layout.fillWidth: true
-                            implicitHeight: 28
+                            implicitHeight: Theme.ctlSmall
                             icon: sr.modelData.audio.muted ? "volume_off" : "volume_up"
                             value: sr.modelData.audio.muted ? 0 : sr.modelData.audio.volume
                             onMoved: v => { sr.modelData.audio.muted = false; sr.modelData.audio.volume = v; }
@@ -669,97 +760,6 @@ PanelWin {
                         }
                     }
                 }
-            }
-        }
-
-        // ──────────────────────────── Settings ────────────────────────────
-        Page {
-            id: settingsPage
-            key: "settings"
-
-            component SetRow: RowLayout {
-                id: sr2
-                property string title: ""
-                property string subtitle: ""
-                property bool checked: false
-                signal toggled
-                Layout.fillWidth: true
-                Layout.topMargin: 2
-                spacing: 12
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    spacing: 1
-                    T { text: sr2.title; Layout.fillWidth: true }
-                    T {
-                        text: sr2.subtitle
-                        visible: text.length > 0
-                        font.pixelSize: Theme.fsSmall
-                        color: Theme.textDim
-                        wrapMode: Text.Wrap
-                        Layout.fillWidth: true
-                    }
-                }
-                Switch {
-                    checked: sr2.checked
-                    onToggled: sr2.toggled()
-                }
-            }
-
-            PageHeader { title: "quartz" }
-            SetRow {
-                title: "24-hour clock"
-                checked: Config.opt.use24h
-                onToggled: Config.opt.use24h = !Config.opt.use24h
-            }
-            SetRow {
-                title: "Workspace numbers"
-                subtitle: "Numbers instead of dots in the bar"
-                checked: Config.opt.workspaceNumbers
-                onToggled: Config.opt.workspaceNumbers = !Config.opt.workspaceNumbers
-            }
-            SetRow {
-                title: "Theme apps from the wallpaper"
-                subtitle: "Terminals, Hyprland borders, cava… follow the wallpaper colours"
-                checked: Config.opt.themeApps
-                onToggled: Config.opt.themeApps = !Config.opt.themeApps
-            }
-            SetRow {
-                title: "Japanese accents"
-                subtitle: "Kanji weekday in the bar, Japanese date on the lock screen"
-                checked: Config.opt.japanese
-                onToggled: Config.opt.japanese = !Config.opt.japanese
-            }
-            T { text: "Wallpaper transition"; Layout.topMargin: 4 }
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 6
-                Repeater {
-                    model: ["grow", "wipe", "wave", "outer", "fade"]
-                    delegate: Rectangle {
-                        required property string modelData
-                        readonly property bool on: Config.opt.transition === modelData
-                        Layout.fillWidth: true
-                        implicitHeight: 32
-                        radius: 16
-                        color: on ? Theme.secondaryContainer : Theme.alpha(Theme.text, 0.06)
-                        Behavior on color { CAnim {} }
-                        T {
-                            anchors.centerIn: parent
-                            text: parent.modelData.charAt(0).toUpperCase() + parent.modelData.slice(1)
-                            font.weight: parent.on ? Font.DemiBold : Font.Normal
-                            color: parent.on ? Theme.secondaryContainerText : Theme.textDim
-                        }
-                        StateLayer { onClicked: Config.opt.transition = parent.modelData }
-                    }
-                }
-            }
-            T {
-                Layout.fillWidth: true
-                Layout.topMargin: 4
-                text: "Wallpapers from " + Config.opt.wallpaperDir.replace(Quickshell.env("HOME"), "~") + "  ·  settings live in ~/.local/state/quartz/config.json"
-                font.pixelSize: Theme.fsSmall
-                color: Theme.textDim
-                wrapMode: Text.Wrap
             }
         }
     }

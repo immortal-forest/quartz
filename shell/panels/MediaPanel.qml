@@ -12,8 +12,8 @@ PanelWin {
     id: win
     name: "media"
     side: "right"
-    cardWidth: 360
-    contentHeight: col.implicitHeight + 36
+    cardWidth: 380
+    contentHeight: col.implicitHeight + Theme.pad * 2
 
     readonly property var p: Media.active
     property real pos: 0
@@ -31,15 +31,44 @@ PanelWin {
 
     ColumnLayout {
         id: col
-        x: 18
-        y: 18
-        width: parent.width - 36
+        x: Theme.pad
+        y: Theme.pad
+        width: parent.width - Theme.pad * 2
         spacing: 14
 
+        // nothing playing: a short empty state instead of a blank cover
+        ColumnLayout {
+            visible: !Media.hasTrack
+            Layout.fillWidth: true
+            Layout.topMargin: 12
+            Layout.bottomMargin: 12
+            spacing: 6
+            Icon {
+                Layout.alignment: Qt.AlignHCenter
+                icon: "music_off"
+                size: 32
+                color: Theme.textDim
+            }
+            T {
+                Layout.alignment: Qt.AlignHCenter
+                text: "Nothing playing"
+                font.family: Theme.display
+                font.pixelSize: Theme.fsTitle
+                font.weight: Font.Medium
+            }
+            T {
+                Layout.alignment: Qt.AlignHCenter
+                text: "Play something in a music app or browser"
+                font.pixelSize: Theme.fsSmall
+                color: Theme.textDim
+            }
+        }
+
         ClippingRectangle {
+            visible: Media.hasTrack
             Layout.fillWidth: true
             Layout.preferredHeight: width
-            radius: 18
+            radius: Theme.rCard
             color: Theme.surfaceHighest
             Image {
                 anchors.fill: parent
@@ -58,11 +87,12 @@ PanelWin {
         }
 
         ColumnLayout {
+            visible: Media.hasTrack
             Layout.fillWidth: true
             spacing: 2
             T {
                 Layout.fillWidth: true
-                text: Media.title || "Nothing playing"
+                text: Media.title
                 font.family: Theme.display
                 font.pixelSize: Theme.fsLarge
                 font.weight: Font.Medium
@@ -77,7 +107,7 @@ PanelWin {
         ColumnLayout {
             Layout.fillWidth: true
             spacing: 4
-            visible: (win.p?.length ?? 0) > 0
+            visible: Media.hasTrack && (win.p?.length ?? 0) > 0
             Item {
                 Layout.fillWidth: true
                 implicitHeight: 16
@@ -85,11 +115,11 @@ PanelWin {
                     anchors.verticalCenter: parent.verticalCenter
                     width: parent.width
                     height: 6
-                    radius: 3
-                    color: Theme.alpha(Theme.text, 0.12)
+                    radius: Theme.pill(height)
+                    color: Theme.tonal
                     Rectangle {
                         height: parent.height
-                        radius: 3
+                        radius: Theme.pill(height)
                         width: parent.width * Math.max(0, Math.min(1, (seek.pressed ? seek.v : win.pos) / (win.p?.length || 1)))
                         color: Theme.primary
                         Behavior on width { enabled: !seek.pressed; Ease { duration: 500 } }
@@ -115,30 +145,32 @@ PanelWin {
         }
 
         RowLayout {
+            visible: Media.hasTrack
             Layout.alignment: Qt.AlignHCenter
-            spacing: 10
+            spacing: 12
             IconBtn {
                 visible: win.p?.shuffleSupported ?? false
                 icon: "shuffle"
+                tonal: false
                 active: win.p?.shuffle ?? false
                 onClicked: win.p.shuffle = !win.p.shuffle
             }
             IconBtn {
                 icon: "skip_previous"
-                size: 44
+                size: 48
                 iconSize: 24
                 onClicked: Media.previous()
             }
             Rectangle {
                 implicitWidth: 72
                 implicitHeight: 56
-                radius: Media.playing ? 18 : 28
+                radius: Media.playing ? Theme.rCard : height / 2
                 color: Theme.primary
-                Behavior on radius { Spring { spring: 4; damping: 0.45 } }
+                Behavior on radius { Spring { baseSpring: 4; baseDamping: 0.45 } }
                 Icon {
                     anchors.centerIn: parent
                     icon: Media.playing ? "pause" : "play_arrow"
-                    size: 30
+                    size: 28
                     fill: 1
                     color: Theme.primaryText
                 }
@@ -149,13 +181,14 @@ PanelWin {
             }
             IconBtn {
                 icon: "skip_next"
-                size: 44
+                size: 48
                 iconSize: 24
                 onClicked: Media.next()
             }
             IconBtn {
                 visible: win.p?.loopSupported ?? false
                 icon: win.p?.loopState === MprisLoopState.Track ? "repeat_one" : "repeat"
+                tonal: false
                 active: (win.p?.loopState ?? MprisLoopState.None) !== MprisLoopState.None
                 onClicked: win.p.loopState = win.p.loopState === MprisLoopState.None ? MprisLoopState.Playlist : win.p.loopState === MprisLoopState.Playlist ? MprisLoopState.Track : MprisLoopState.None
             }
@@ -167,22 +200,13 @@ PanelWin {
             spacing: 6
             Repeater {
                 model: Media.players
-                delegate: Rectangle {
+                delegate: Chip {
                     required property var modelData
-                    readonly property bool on: modelData === Media.active
                     Layout.fillWidth: true
-                    implicitHeight: 30
-                    radius: 15
-                    color: on ? Theme.secondaryContainer : Theme.alpha(Theme.text, 0.06)
-                    T {
-                        anchors.centerIn: parent
-                        width: parent.width - 16
-                        horizontalAlignment: Text.AlignHCenter
-                        text: parent.modelData.identity
-                        font.pixelSize: Theme.fsSmall
-                        color: parent.on ? Theme.secondaryContainerText : Theme.textDim
-                    }
-                    StateLayer { onClicked: Media.last = parent.modelData }
+                    small: true
+                    text: modelData.identity
+                    selected: modelData === Media.active
+                    onClicked: Media.last = modelData
                 }
             }
         }

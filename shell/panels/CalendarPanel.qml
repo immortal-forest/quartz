@@ -10,13 +10,13 @@ PanelWin {
     id: win
     name: "calendar"
     side: "center"
-    cardWidth: 340
-    contentHeight: col.implicitHeight + 36
+    cardWidth: 360
+    contentHeight: col.implicitHeight + Theme.pad * 2
 
     readonly property date today: Notifs.now
     property int offset: 0
     readonly property date month: new Date(today.getFullYear(), today.getMonth() + offset, 1)
-    readonly property int firstDow: Qt.locale().firstDayOfWeek % 7
+    readonly property int firstDow: Config.opt.weekStart === "monday" ? 1 : Config.opt.weekStart === "sunday" ? 0 : Qt.locale().firstDayOfWeek % 7
     readonly property var cells: {
         const y = month.getFullYear(), m = month.getMonth();
         const lead = (month.getDay() - firstDow + 7) % 7;
@@ -31,29 +31,30 @@ PanelWin {
 
     ColumnLayout {
         id: col
-        x: 18
-        y: 18
-        width: parent.width - 36
-        spacing: 10
+        x: Theme.pad
+        y: Theme.pad
+        width: parent.width - Theme.pad * 2
+        spacing: 12
 
         ColumnLayout {
+            Layout.fillWidth: true
             spacing: 0
             T {
                 text: Qt.formatDateTime(win.today, "dddd")
                 font.family: Theme.display
-                font.pixelSize: 26
+                font.pixelSize: Theme.fsLarge
                 font.weight: Font.Medium
-                color: Theme.primary
             }
             T {
                 text: Qt.formatDateTime(win.today, "d MMMM yyyy")
+                font.pixelSize: Theme.fsSmall
                 color: Theme.textDim
             }
         }
 
         RowLayout {
             Layout.fillWidth: true
-            Layout.topMargin: 4
+            spacing: 6
             T {
                 Layout.fillWidth: true
                 text: Qt.formatDateTime(win.month, "MMMM yyyy")
@@ -63,32 +64,33 @@ PanelWin {
             IconBtn {
                 visible: win.offset !== 0
                 icon: "today"
-                size: 30
+                size: Theme.ctlSmall
                 onClicked: win.offset = 0
             }
             IconBtn {
                 icon: "chevron_left"
-                size: 30
+                size: Theme.ctlSmall
                 onClicked: win.offset--
             }
             IconBtn {
                 icon: "chevron_right"
-                size: 30
+                size: Theme.ctlSmall
                 onClicked: win.offset++
             }
         }
 
-        GridLayout {
+        // 7 equal columns: weekday letters, then 6 weeks
+        Grid {
             id: grid
             Layout.fillWidth: true
             columns: 7
-            rowSpacing: 2
-            columnSpacing: 2
+            readonly property real cw: width / 7
             Repeater {
                 model: 7
                 delegate: T {
                     required property int index
-                    Layout.fillWidth: true
+                    width: grid.cw
+                    height: 28
                     horizontalAlignment: Text.AlignHCenter
                     text: Qt.locale().dayName((index + win.firstDow) % 7, Locale.NarrowFormat)
                     font.pixelSize: Theme.fsSmall
@@ -102,21 +104,21 @@ PanelWin {
                     id: cell
                     required property int index
                     readonly property var c: win.cells[index]
-                    Layout.fillWidth: true
-                    implicitHeight: 38
+                    width: grid.cw
+                    height: Theme.ctl + 2
                     Rectangle {
                         anchors.centerIn: parent
-                        width: 34
-                        height: 34
-                        radius: 17
+                        width: Theme.ctl - 2
+                        height: Theme.ctl - 2
+                        radius: Theme.pill(height)
                         color: cell.c.today ? Theme.primary : "transparent"
                     }
                     T {
                         anchors.centerIn: parent
                         text: cell.c.day
                         font.features: { "tnum": 1 }
-                        font.weight: cell.c.today ? Font.Bold : Font.Normal
-                        color: cell.c.today ? Theme.primaryText : !cell.c.inMonth ? Theme.alpha(Theme.textDim, 0.45) : cell.c.weekend ? Theme.textDim : Theme.text
+                        font.weight: cell.c.today ? Font.Bold : Font.Medium
+                        color: cell.c.today ? Theme.primaryText : !cell.c.inMonth ? Theme.alpha(Theme.textDim, 0.4) : cell.c.weekend ? Theme.textDim : Theme.text
                     }
                 }
             }

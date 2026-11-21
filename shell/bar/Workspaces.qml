@@ -29,13 +29,19 @@ Item {
     function wsFor(id) { return mine.find(w => w.id === id) ?? null; }
     function go(target) { Hypr.workspace(target); }
 
-    implicitWidth: row.implicitWidth + 20
-    implicitHeight: 28
+    // marks are vertically centred in the barItem-tall group; number pills pad
+    // the ends by their own vertical inset (concentric with the bar's corner),
+    // dots by the chips' padding
+    readonly property real mark: numbers ? Theme.barItem - 8 : 10
+    readonly property real padX: numbers ? (Theme.barItem - mark) / 2 : Theme.padCard
+
+    implicitWidth: row.implicitWidth + padX * 2
+    implicitHeight: Theme.barItem
 
     RowLayout {
         id: row
         anchors.centerIn: parent
-        spacing: root.numbers ? 4 : 6
+        spacing: root.numbers ? Theme.spacing / 2 : Theme.spacing
         Repeater {
             // An int model: delegates are only rebuilt when the slot COUNT changes,
             // so switching workspaces animates instead of rebuilding the row.
@@ -48,26 +54,30 @@ Item {
                 readonly property bool active: wsId === root.activeId
                 readonly property bool occupied: (ws?.toplevels?.values?.length ?? 0) > 0
                 readonly property bool urgent: ws?.urgent ?? false
+                readonly property real h: root.mark
 
-                implicitWidth: root.numbers ? (active ? 30 : 20) : (active ? 24 : 8)
-                implicitHeight: root.numbers ? 20 : 8
-                radius: height / 2
-                color: active ? Theme.primary : urgent ? Theme.error : occupied ? Theme.alpha(Theme.text, 0.55) : Theme.alpha(Theme.text, 0.20)
-                Behavior on implicitWidth { Spring { spring: 4.2; damping: 0.5 } }
+                implicitWidth: root.numbers ? (active ? h + 14 : h) : (active ? 28 : h)
+                implicitHeight: h
+                radius: Theme.pill(h)
+                color: active ? Theme.primary : urgent ? Theme.error
+                     : root.numbers ? (occupied ? Theme.alpha(Theme.text, 0.14) : "transparent")
+                     : (occupied ? Theme.alpha(Theme.text, 0.55) : Theme.alpha(Theme.text, 0.22))
+                Behavior on implicitWidth { Spring { baseSpring: 4.2; baseDamping: 0.5 } }
                 Behavior on color { CAnim {} }
 
                 T {
                     anchors.centerIn: parent
                     visible: root.numbers
                     text: dot.wsId
-                    font.pixelSize: Theme.fsSmall
-                    font.weight: dot.active ? Font.Bold : Font.Medium
-                    color: dot.active ? Theme.primaryText : dot.occupied ? Theme.text : Theme.textDim
+                    font.pixelSize: Theme.fsSmall + 1
+                    font.weight: dot.active ? Font.Bold : Font.DemiBold
+                    font.features: { "tnum": 1 }
+                    color: dot.active ? Theme.primaryText : dot.urgent ? Theme.primaryText : dot.occupied ? Theme.text : Theme.alpha(Theme.textDim, 0.7)
                 }
-                MouseArea {
-                    anchors.fill: parent
-                    anchors.margins: -5
-                    cursorShape: Qt.PointingHandCursor
+                StateLayer {
+                    anchors.margins: -2
+                    radius: dot.radius + 2
+                    acceptedButtons: Qt.LeftButton
                     onClicked: root.go(dot.wsId)
                 }
             }

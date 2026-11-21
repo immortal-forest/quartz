@@ -30,6 +30,21 @@ Singleton {
             return "";
         return n.description || n.nickname || n.name || "";
     }
+    // a short label for tight spots (tiles): what the device IS, not its chip
+    function shortName(n) {
+        if (!n)
+            return "";
+        const id = (n.name || "").toLowerCase(), d = name(n);
+        if (id.indexOf("bluez") >= 0)
+            return d;
+        if (id.indexOf("hdmi") >= 0 || id.indexOf("displayport") >= 0)
+            return "HDMI";
+        if (id.indexOf("usb") >= 0)
+            return d.replace(/ (Analog|Digital) (Stereo|Surround.*)$/i, "");
+        if (id.indexOf("source") >= 0 || id.indexOf("input") >= 0)
+            return "Built-in mic";
+        return "Speakers";
+    }
     function setVolume(v) {
         if (sink?.audio) {
             sink.audio.muted = false;

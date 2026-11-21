@@ -15,6 +15,8 @@ Singleton {
     readonly property string current: Config.opt.wallpaper
     readonly property string palettePath: Theme.cacheDir + "/palette.json"
     property bool available: false    // awww installed
+    property bool setwall: false      // no awww, but a `setwall` script sets it instead
+    readonly property bool canSet: available || setwall
     property var files: []            // absolute paths, sorted
     property var folders: []          // top-level folders under wallpaperDir
     property bool scanned: false
@@ -249,7 +251,7 @@ Singleton {
             "if command -v awww >/dev/null; then echo AWWW; " +
             "pgrep -x awww-daemon >/dev/null || { setsid -f awww-daemon >/dev/null 2>&1; i=0; until awww query >/dev/null 2>&1 || [ $i -ge 30 ]; do sleep 0.1; i=$((i+1)); done; }; " +
             "[ -n \"$w\" ] && { awww query 2>/dev/null | grep -qF \"$w\" || awww img \"$w\" --transition-type fade --transition-duration 0.8 >/dev/null 2>&1; }; " +
-            "else echo NOAWWW; fi; " +
+            "else echo NOAWWW; command -v setwall >/dev/null && echo SETWALL; fi; " +
             "[ -n \"$w\" ] && echo \"WALL $w\"; " +
             "[ -n \"$w\" ] && { ! [ -s \"$HOME/.cache/quartz/palette.json\" ] || [ \"$w\" != \"$1\" ]; } && echo RETHEME; true",
             "_", Config.opt.wallpaper]
@@ -259,7 +261,9 @@ Singleton {
                     root.available = true;
                 } else if (line === "NOAWWW") {
                     root.available = false;
-                    console.warn("quartz: awww is not installed — wallpapers can't be changed (sudo pacman -S awww)");
+                    warnLater.start();
+                } else if (line === "SETWALL") {
+                    root.setwall = true;
                 } else if (line.startsWith("WALL ")) {
                     const w = line.substring(5);
                     if (Config.opt.wallpaper !== w)
@@ -269,5 +273,10 @@ Singleton {
                 }
             }
         }
+    }
+    Timer {
+        id: warnLater
+        interval: 100
+        onTriggered: if (!root.canSet) console.warn("quartz: awww is not installed — wallpapers can't be changed (sudo pacman -S awww)")
     }
 }

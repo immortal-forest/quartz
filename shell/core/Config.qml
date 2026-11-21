@@ -37,7 +37,7 @@ Singleton {
         o.barTitle = true; o.barMedia = true; o.barDate = true; o.batteryPercent = true;
         o.popupTime = "normal"; o.autoWallpaper = 0; o.accent = ""; o.roundness = 1; o.motion = 2;
         o.clockSeconds = false; o.weekStart = "locale"; o.lockMedia = true;
-        o.nightLight = false; o.nightTemp = 4500;
+        o.nightLight = false; o.nightTemp = 4500; o.audioFollow = true;
     }
 
     function bumpLaunch(id) {
@@ -102,6 +102,8 @@ Singleton {
             // display
             property bool nightLight: false       // hyprsunset
             property int nightTemp: 4500          // kelvin
+            // sound
+            property bool audioFollow: true       // Bluetooth outputs take over the sound when they connect
         }
     }
 }

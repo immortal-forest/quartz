@@ -149,6 +149,7 @@ Singleton {
         { label: "Clear all notifications", section: "notifications", icon: "clear_all", words: "notifications clear delete history" },
         { label: "Volume and microphone", section: "sound", icon: "volume_up", words: "volume sound audio speaker mic microphone mute" },
         { label: "Sound output device", section: "sound", icon: "speaker", words: "speakers headphones output device audio bluetooth hdmi" },
+        { label: "Switch to headphones when they connect", section: "sound", icon: "headphones", words: "bluetooth headphones earbuds headset speaker connect switch automatic output follow" },
         { label: "Brightness", section: "sound", icon: "brightness_medium", words: "brightness screen display dim light" },
         { label: "Night light", section: "sound", icon: "nightlight", words: "night light warm blue filter eyes evening hyprsunset" },
         { label: "Power mode", section: "sound", icon: "bolt", words: "power battery saver performance balanced profile" },

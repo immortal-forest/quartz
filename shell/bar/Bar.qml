@@ -90,26 +90,34 @@ PanelWindow {
             anchors.centerIn: parent
             screenName: bar.scr.name
         }
+        // The song, the tray and the status icons sit `groupGap` apart, ink to
+        // ink: each margin takes off the padding its neighbours already have
+        // inside (the chip's, a tray cell's, the status pill's).
         RowLayout {
             id: rightRow
+            readonly property real groupGap: Theme.pad + Theme.padCard
+            readonly property real trayPad: (Theme.barItem - Theme.iconBar) / 2
             anchors.right: parent.right
             anchors.rightMargin: bar.inset
             anchors.verticalCenter: parent.verticalCenter
-            spacing: Theme.spacing
+            spacing: 0
             MediaChip {
                 id: media
                 screenName: bar.scr.name
                 maxWidth: pill.width - bar.inset - clock.x - clock.width - bar.clockGap
-                          - (tray.visible ? tray.implicitWidth + rightRow.spacing : 0)
-                          - status.implicitWidth - rightRow.spacing
+                          - (tray.visible ? tray.implicitWidth + tray.Layout.leftMargin : 0)
+                          - status.implicitWidth - status.Layout.leftMargin
             }
             Tray {
                 id: tray
                 screenName: bar.scr.name
+                Layout.leftMargin: media.shown ? rightRow.groupGap - media.padX - rightRow.trayPad : 0
             }
             Status {
                 id: status
                 screenName: bar.scr.name
+                Layout.leftMargin: tray.visible ? rightRow.groupGap - rightRow.trayPad - status.padX
+                                 : media.shown ? rightRow.groupGap - media.padX - status.padX : 0
             }
         }
     }

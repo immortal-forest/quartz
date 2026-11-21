@@ -76,6 +76,7 @@ PanelWin {
         property string trailing: ""
         property bool hasSwitch: false
         property bool checked: false
+        property real battery: -1          // 0–1: a battery meter beside the trailing icon
         default property alias extra: extraCol.data
         signal clicked
         readonly property real inset: (Theme.row - Theme.ctl) / 2
@@ -141,6 +142,21 @@ PanelWin {
                     loops: Animation.Infinite
                 }
             }
+            RowLayout {
+                visible: lr.battery >= 0
+                spacing: 2
+                Icon {
+                    icon: lr.battery <= 0.15 ? "battery_android_frame_alert" : lr.battery >= 0.95 ? "battery_android_frame_full" : "battery_android_frame_" + Math.max(1, Math.min(6, Math.round(lr.battery * 6)))
+                    size: 18
+                    color: lr.battery <= 0.15 ? Theme.error : Theme.textDim
+                }
+                T {
+                    text: Math.round(lr.battery * 100) + "%"
+                    font.pixelSize: Theme.fsSmall
+                    font.features: { "tnum": 1 }
+                    color: lr.battery <= 0.15 ? Theme.error : Theme.textDim
+                }
+            }
             Icon {
                 visible: !lr.busy && lr.trailing.length > 0
                 // ink at the row's inset, mirroring the icon disc on the left
@@ -149,6 +165,9 @@ PanelWin {
                 icon: lr.trailing
                 size: 18
                 color: lr.active ? Theme.primary : Theme.textDim
+                // a chevron turns to show the row is open
+                rotation: lr.trailing === "expand_more" && lr.expanded ? 180 : 0
+                Behavior on rotation { Ease { duration: Anim.normal; easing.bezierCurve: Anim.emphasized } }
             }
             Switch {
                 visible: lr.hasSwitch
@@ -331,7 +350,9 @@ PanelWin {
                     text: "Screenshot"
                     onClicked: {
                         Ui.closeAll();
-                        Quickshell.execDetached(["sh", "-c", "sleep 0.35; hyprshot -m region"]);
+                        Quickshell.execDetached(["sh", "-c", "sleep 0.35; command -v hyprshot >/dev/null && exec hyprshot -m region; " +
+                            "d=$(xdg-user-dir PICTURES 2>/dev/null || echo \"$HOME/Pictures\")/Screenshots; mkdir -p \"$d\"; f=\"$d/$(date +%Y-%m-%d_%H-%M-%S).png\"; " +
+                            "g=$(slurp) && grim -g \"$g\" \"$f\" && wl-copy < \"$f\" && notify-send -i \"$f\" Screenshot \"Saved and copied\""]);
                     }
                 }
                 Button {
@@ -532,17 +553,23 @@ PanelWin {
                             RowLayout {
                                 Layout.fillWidth: true
                                 spacing: Theme.spacing
-                                Item { Layout.fillWidth: true }
                                 Button {
                                     visible: nr.modelData.known
+                                    Layout.fillWidth: true
+                                    Layout.preferredWidth: 1
                                     small: true
+                                    icon: "delete"
                                     text: "Forget"
                                     filled: false
+                                    fg: Theme.error
                                     onClicked: { nr.modelData.forget(); nr.expanded = false; }
                                 }
                                 Button {
                                     visible: nr.modelData.connected
+                                    Layout.fillWidth: true
+                                    Layout.preferredWidth: 1
                                     small: true
+                                    icon: "link_off"
                                     text: "Disconnect"
                                     filled: false
                                     onClicked: { nr.modelData.disconnect(); nr.expanded = false; }
@@ -550,7 +577,10 @@ PanelWin {
                                 Button {
                                     id: connectBtn
                                     visible: !nr.modelData.connected
+                                    Layout.fillWidth: true
+                                    Layout.preferredWidth: 1
                                     small: true
+                                    icon: "link"
                                     text: "Connect"
                                     onClicked: {
                                         nr.err = "";
@@ -617,7 +647,8 @@ PanelWin {
                             readonly property bool changing: modelData.state === BluetoothDeviceState.Connecting || modelData.state === BluetoothDeviceState.Disconnecting || modelData.pairing
                             icon: Bt.deviceIcon(modelData)
                             title: modelData.name
-                            subtitle: modelData.connected ? ("Connected" + (modelData.batteryAvailable ? " · " + Math.round(modelData.battery * (modelData.battery > 1 ? 1 : 100)) + "%" : "")) : modelData.pairing ? "Pairing…" : changing ? "Connecting…" : modelData.paired ? "Paired · tap to connect" : "Tap to pair"
+                            battery: modelData.connected && modelData.batteryAvailable ? (modelData.battery > 1 ? modelData.battery / 100 : modelData.battery) : -1
+                            subtitle: modelData.connected ? (expanded ? "Connected" : "Connected · tap for options") : modelData.pairing ? "Pairing…" : changing ? "Connecting…" : modelData.paired ? "Paired · tap to connect" : "Tap to pair"
                             active: modelData.connected
                             busy: changing
                             trailing: modelData.connected ? "expand_more" : ""
@@ -644,16 +675,23 @@ PanelWin {
                             RowLayout {
                                 Layout.fillWidth: true
                                 spacing: Theme.spacing
-                                Item { Layout.fillWidth: true }
                                 Button {
+                                    Layout.fillWidth: true
+                                    Layout.preferredWidth: 1
                                     small: true
+                                    icon: "delete"
                                     text: "Forget"
                                     filled: false
+                                    fg: Theme.error
                                     onClicked: { br.modelData.forget(); br.expanded = false; }
                                 }
                                 Button {
+                                    Layout.fillWidth: true
+                                    Layout.preferredWidth: 1
                                     small: true
+                                    icon: "link_off"
                                     text: "Disconnect"
+                                    filled: false
                                     onClicked: { br.modelData.disconnect(); br.expanded = false; }
                                 }
                             }
@@ -695,7 +733,9 @@ PanelWin {
                     delegate: ListRow {
                         required property var modelData
                         icon: modelData.name.indexOf("bluez") >= 0 ? "headphones" : modelData.name.indexOf("hdmi") >= 0 ? "tv" : "speaker"
-                        title: Audio.name(modelData)
+                        // what it is first ("Speakers"), the chip's long name under it
+                        title: Audio.shortName(modelData)
+                        subtitle: Audio.shortName(modelData) !== Audio.name(modelData) ? Audio.name(modelData).replace(/ (Analog|Digital) (Stereo|Mono|Surround.*)$/i, "") : ""
                         active: modelData === Audio.sink
                         trailing: active ? "check" : ""
                         onClicked: Audio.useSink(modelData)
@@ -721,7 +761,9 @@ PanelWin {
                     delegate: ListRow {
                         required property var modelData
                         icon: "mic"
-                        title: Audio.name(modelData)
+                        // what it is first ("Speakers"), the chip's long name under it
+                        title: Audio.shortName(modelData)
+                        subtitle: Audio.shortName(modelData) !== Audio.name(modelData) ? Audio.name(modelData).replace(/ (Analog|Digital) (Stereo|Mono|Surround.*)$/i, "") : ""
                         active: modelData === Audio.source
                         trailing: active ? "check" : ""
                         onClicked: Audio.useSource(modelData)

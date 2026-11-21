@@ -10,6 +10,7 @@ import "../widgets"
 Scope {
     id: root
     property string kind: "volume"
+    property string device: ""
     property bool show: false
     property bool lingering: false
 
@@ -23,6 +24,10 @@ Scope {
     Connections {
         target: Audio
         function onChanged(k) { if (Ui.panel !== "control") root.trigger(k); }
+    }
+    Connections {
+        target: Audio
+        function onSwitched(name) { root.device = name; root.trigger("device"); }
     }
     Connections {
         target: Brightness
@@ -59,7 +64,7 @@ Scope {
             mask: Region {}
 
             readonly property real value: root.kind === "brightness" ? Brightness.value : root.kind === "mic" ? (Audio.micMuted ? 0 : Audio.micVolume) : (Audio.muted ? 0 : Audio.volume)
-            readonly property string icon: root.kind === "brightness" ? Brightness.icon : root.kind === "mic" ? Audio.micIcon : Audio.icon
+            readonly property string icon: root.kind === "brightness" ? Brightness.icon : root.kind === "mic" ? Audio.micIcon : root.kind === "device" ? "headphones" : Audio.icon
             property bool shown: false
             Component.onCompleted: shown = Qt.binding(() => root.show)
 
@@ -87,7 +92,15 @@ Scope {
                         fill: 1
                         color: Theme.primary
                     }
+                    T {
+                        visible: root.kind === "device"
+                        Layout.fillWidth: true
+                        text: root.device
+                        font.weight: Font.DemiBold
+                        elide: Text.ElideRight
+                    }
                     Rectangle {
+                        visible: root.kind !== "device"
                         Layout.fillWidth: true
                         implicitHeight: 8
                         radius: Theme.pill(height)

@@ -711,6 +711,13 @@ FloatingWindow {
                         subtitle: Audio.name(Audio.sink)
                         Button { small: true; filled: false; text: "Choose…"; onClicked: { Ui.settings = false; Ui.togglePanel("control", "", "audio"); } }
                     }
+                    Divider {}
+                    SettingRow {
+                        icon: "headphones"
+                        title: "Switch to headphones when they connect"
+                        subtitle: "Bluetooth headphones and speakers take over the sound"
+                        Switch { checked: Config.opt.audioFollow; onToggled: Config.opt.audioFollow = !Config.opt.audioFollow }
+                    }
                 }
                 Group {
                     visible: win.section === "sound" && Brightness.available

@@ -88,7 +88,7 @@ OverlayWin {
             }
 
             Rectangle {
-                visible: !Wallpaper.available
+                visible: !Wallpaper.canSet
                 Layout.fillWidth: true
                 implicitHeight: 48
                 radius: Theme.rCard

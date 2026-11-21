@@ -65,23 +65,23 @@ Item {
         // clock
         ColumnLayout {
             anchors.horizontalCenter: parent.horizontalCenter
-            y: parent.height * 0.22 + (surf.entered ? 0 : 40)
+            y: parent.height * 0.17 + (surf.entered ? 0 : 40)
             spacing: 0
             Behavior on y { Ease { duration: 900; easing.bezierCurve: Anim.decel } }
             T {
                 Layout.alignment: Qt.AlignHCenter
                 text: Qt.formatDateTime(clock.date, Config.opt.use24h ? "HH:mm" : "h:mm")
                 font.family: Theme.display
-                font.pixelSize: 150
+                font.pixelSize: Math.round(Math.max(160, Math.min(260, surf.height * 0.22)))
                 font.weight: Font.Light
                 font.features: { "tnum": 1 }
                 color: Theme.text
             }
             T {
                 Layout.alignment: Qt.AlignHCenter
-                Layout.topMargin: -12
+                Layout.topMargin: -Math.round(surf.height * 0.012)
                 text: Qt.formatDateTime(clock.date, "dddd, d MMMM")
-                font.pixelSize: 22
+                font.pixelSize: 26
                 font.weight: Font.Medium
                 color: Theme.alpha(Theme.text, 0.85)
             }

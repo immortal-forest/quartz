@@ -11,7 +11,8 @@ Rectangle {
     property string screenName: ""
     readonly property bool open: Ui.panel === "control" && Ui.screen === screenName
 
-    implicitWidth: row.implicitWidth + Theme.padCard * 2
+    readonly property real padX: Theme.pad   // ink to the pill's edge
+    implicitWidth: row.implicitWidth + padX * 2
     implicitHeight: Theme.barItem
     radius: Theme.rBarItem
     color: open ? Theme.alpha(Theme.primary, 0.16) : "transparent"
@@ -20,7 +21,7 @@ Rectangle {
     RowLayout {
         id: row
         anchors.centerIn: parent
-        spacing: Theme.spacing
+        spacing: Theme.padCard
         Icon {
             icon: Net.icon
             size: Theme.iconBar

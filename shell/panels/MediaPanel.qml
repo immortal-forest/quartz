@@ -17,6 +17,9 @@ PanelWin {
 
     readonly property var p: Media.active
     property real pos: 0
+    // paused players report where they are too: read it on open and on a new player
+    Component.onCompleted: pos = p?.position ?? 0
+    onPChanged: pos = p?.position ?? 0
     Timer {
         interval: 500
         repeat: true

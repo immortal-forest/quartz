@@ -13,6 +13,11 @@ ClippingRectangle {
 
     property real pos: 0
     property bool live: true        // false while its panel is hidden: no position updates
+    onLiveChanged: if (live) pos = Media.active?.position ?? 0
+    Connections {
+        target: Media
+        function onActiveChanged() { root.pos = Media.active?.position ?? 0; }
+    }
     Timer {
         interval: 1000
         repeat: true

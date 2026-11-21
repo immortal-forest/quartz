@@ -2,6 +2,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Services.Pipewire
+import "../core"
 
 // quartz — default output/input, devices and app streams (Pipewire).
 Singleton {
@@ -66,6 +67,51 @@ Singleton {
             source.audio.muted = !source.audio.muted;
     }
     function useSink(n) { Pipewire.preferredDefaultAudioSink = n; }
+
+    // Bluetooth headphones and speakers become the output when they connect
+    // (Settings › Sound). WirePlumber only remembers the output you last picked
+    // by hand, so without this a new headset, or one you used after choosing
+    // the speakers, connects but stays silent. Only outputs that appear after
+    // startup count: restarting the shell never moves the sound.
+    signal switched(string device)
+    property var seen: null   // sink ids already here; null until Pipewire settles
+    onSinksChanged: {
+        const now = {};
+        for (const n of sinks) {
+            now[n.id] = true;
+            if (seen && !seen[n.id] && Config.opt.audioFollow && (n.name || "").startsWith("bluez_output"))
+                followTimer.pending = n;
+        }
+        if (seen)
+            seen = now;
+        if (followTimer.pending)
+            followTimer.restart();
+    }
+    Timer {
+        id: settle
+        interval: 2500
+        running: Pipewire.ready
+        onTriggered: {
+            const now = {};
+            for (const n of root.sinks)
+                now[n.id] = true;
+            root.seen = now;
+        }
+    }
+    // a moment for the node to finish binding before WirePlumber is asked
+    Timer {
+        id: followTimer
+        property var pending: null
+        interval: 400
+        onTriggered: {
+            const n = pending;
+            pending = null;
+            if (n && root.sinks.indexOf(n) >= 0 && n !== root.sink) {
+                root.useSink(n);
+                root.switched(root.name(n));
+            }
+        }
+    }
     function useSource(n) { Pipewire.preferredDefaultAudioSource = n; }
 
     PwObjectTracker {

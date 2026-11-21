@@ -16,7 +16,7 @@ RowLayout {
     property bool showText: true
     property real size: Theme.iconBar + 2
     visible: present
-    spacing: 4
+    spacing: 5
 
     Icon {
         icon: root.charging ? "battery_android_frame_bolt"

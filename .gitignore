@@ -1,0 +1,9 @@
+# editor / tooling
+.qmlls.ini
+*.qmlc
+*.jsc
+.vscode/
+.idea/
+
+# local-only files
+.claude/

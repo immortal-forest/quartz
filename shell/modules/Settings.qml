@@ -19,7 +19,10 @@ FloatingWindow {
     implicitHeight: 680
     minimumSize: Qt.size(720, 500)
     onVisibleChanged: if (!visible) Ui.settings = false
-    Component.onCompleted: System.check()   // pick up night light / power mode installed since
+    Component.onCompleted: {
+        System.check();   // pick up night light / power mode installed since
+        Binds.refresh();  // the shortcuts Hyprland really has
+    }
     property bool confirmReset: false
 
     property string section: Ui.settingsSection
@@ -870,7 +873,7 @@ FloatingWindow {
                     onClicked: { Ui.settings = false; Ui.toggleOverlay("help"); }
                 }
                 Repeater {
-                    model: win.section === "shortcuts" ? Binds.groups : []
+                    model: win.section === "shortcuts" ? Binds.visibleGroups : []
                     delegate: Group {
                         id: kg
                         required property var modelData

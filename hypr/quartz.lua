@@ -14,6 +14,11 @@
 --   autostart    start quartz when Hyprland starts      (default false)
 --   clipboard    start the clipboard-history watchers (cliphist) with Hyprland (default false)
 --   restart      command for mod+Shift+R                 (default: kill + relaunch quartz)
+--   essentials   a complete keymap for windows, workspaces, apps and screenshots,
+--                the one the cheatsheet (Super + /) shows   (default false)
+--   take_over    quartz's keys replace whatever your config bound on them
+--                before (e.g. Hyprland's example: Super + M = quit) instead of
+--                being skipped                                (default false)
 --   skip         keys quartz leaves alone because your config uses them,
 --                written like quartz writes them: { "SUPER + C", "XF86AudioPlay" }
 --   gpu          "integrated": run quartz on the integrated GPU (Mesa) on a
@@ -38,10 +43,23 @@ local function g(name) return hl.dsp.global("quartz:" .. name) end
 -- "SUPER + comma" and "super+COMMA" are the same key
 local function norm(keys) return (keys:gsub("%s", ""):upper()) end
 
-local skipped = {} -- filled from setup's `skip`
+local skipped = {}   -- filled from setup's `skip`
+local take_over = false
 local function bind(keys, ...)
 	if skipped[norm(keys)] then return end
+	if take_over then hl.unbind(keys) end
 	return hl.bind(keys, ...)
+end
+-- the essentials keymap: same rules, its own name so install.sh only checks
+-- these keys for clashes when the keymap is on
+local ebind = bind
+
+-- bind options carrying a description (shown by `hyprctl binds` and other
+-- tools); always a fresh table, so shared flag tables are never modified
+local function desc(text, flags)
+	local t = { description = "quartz: " .. text }
+	for k, v in pairs(flags or {}) do t[k] = v end
+	return t
 end
 
 local function exists(path)
@@ -73,41 +91,89 @@ local function drm_card(pci)
 end
 
 function M.binds(mod, restart)
-	bind(mod .. " + Space",     g("launcher"))        -- app launcher
-	bind(mod .. " + V",         g("clipboard"))       -- clipboard history
-	bind(mod .. " + Escape",    g("power"))           -- power / session menu
-	bind(mod .. " + A",         g("control"))         -- control centre
-	bind(mod .. " + N",         g("control"))         -- notifications live in the control centre
-	bind(mod .. " + K",         g("wifi"))            -- control centre › Wi-Fi
-	bind(mod .. " + D",         g("calendar"))        -- calendar
-	bind(mod .. " + M",         g("media"))           -- now playing
-	bind(mod .. " + comma",     g("settings"))        -- quartz settings
-	bind(mod .. " + slash",     g("help"))            -- keyboard cheatsheet
-	bind(mod .. " + C",         g("wallpapers"))      -- wallpaper picker
-	bind(mod .. " + SHIFT + C", g("randomWallpaper")) -- random wallpaper
-	bind(mod .. " + L",         hl.dsp.exec_cmd("loginctl lock-session")) -- lock
-	bind(mod .. " + SHIFT + R", hl.dsp.exec_cmd(restart))                -- restart quartz
+	bind(mod .. " + Space",     g("launcher"),        desc("App launcher"))              -- app launcher
+	bind(mod .. " + V",         g("clipboard"),       desc("Clipboard history"))         -- clipboard history
+	bind(mod .. " + Escape",    g("power"),           desc("Power menu"))                -- power / session menu
+	bind(mod .. " + A",         g("control"),         desc("Control centre"))            -- control centre
+	bind(mod .. " + N",         g("control"),         desc("Notifications"))             -- notifications live in the control centre
+	bind(mod .. " + SHIFT + N", g("dnd"),             desc("Do not disturb on / off"))   -- do not disturb
+	bind(mod .. " + K",         g("wifi"),            desc("Wi-Fi"))                     -- control centre › Wi-Fi
+	bind(mod .. " + B",         g("bluetooth"),       desc("Bluetooth"))                 -- control centre › Bluetooth
+	bind(mod .. " + SHIFT + A", g("sound"),           desc("Sound devices and apps"))    -- control centre › Sound
+	bind(mod .. " + D",         g("calendar"),        desc("Calendar"))                  -- calendar
+	bind(mod .. " + M",         g("media"),           desc("Now playing"))               -- now playing
+	bind(mod .. " + comma",     g("settings"),        desc("Settings"))                  -- quartz settings
+	bind(mod .. " + slash",     g("help"),            desc("Keyboard shortcuts"))        -- keyboard cheatsheet
+	bind(mod .. " + C",         g("wallpapers"),      desc("Wallpaper picker"))          -- wallpaper picker
+	bind(mod .. " + SHIFT + C", g("randomWallpaper"), desc("Random wallpaper"))          -- random wallpaper
+	bind(mod .. " + L",         hl.dsp.exec_cmd("loginctl lock-session"), desc("Lock the screen")) -- lock
+	bind(mod .. " + SHIFT + R", hl.dsp.exec_cmd(restart), desc("Restart quartz"))        -- restart quartz
 end
 
 -- Hardware keys: `locked` keeps them working on the lock screen, `dont_inhibit`
 -- gets past fullscreen games, `repeating` steps while held. The brightnessctl
 -- fallback (quartz not running) steps the real level linearly and never goes
 -- below 2 % of max (-n = max/50 + 1): some panels switch off at the bottom.
+-- A complete keymap (essentials = true): windows, workspaces, apps and
+-- screenshots, laid out like the cheatsheet (Super + /).
+local TERMINAL = "sh -c '${TERMINAL:-$(command -v ghostty kitty foot alacritty wezterm konsole xterm | head -n 1)}'"
+local BROWSER = "sh -c 'b=$(xdg-settings get default-web-browser 2>/dev/null); gtk-launch \"${b%.desktop}\" 2>/dev/null || xdg-open https://'"
+local SHOT_ALL = "sh -c 'd=$(xdg-user-dir PICTURES 2>/dev/null || echo \"$HOME/Pictures\")/Screenshots; mkdir -p \"$d\"; f=\"$d/$(date +%Y-%m-%d_%H-%M-%S).png\"; grim \"$f\" && wl-copy < \"$f\" && notify-send -i \"$f\" Screenshot \"Saved and copied\"'"
+
+function M.essentials(mod)
+	local rep = { repeating = true }
+	-- windows
+	ebind(mod .. " + Q",         hl.dsp.window.close(),                  desc("Close the window"))         -- close the window
+	ebind(mod .. " + W",         hl.dsp.window.float({ action = "toggle" }), desc("Float / tile"))          -- float / tile
+	ebind("ALT + Return",        hl.dsp.window.fullscreen(),             desc("Fullscreen"))                -- fullscreen
+	ebind(mod .. " + G",         hl.dsp.group.toggle(),                  desc("Group / ungroup"))           -- group / ungroup
+	ebind(mod .. " + S",         hl.dsp.workspace.toggle_special("scratch"), desc("Scratchpad"))            -- scratchpad
+	for _, d in ipairs({ { "left", -30, 0 }, { "right", 30, 0 }, { "up", 0, -30 }, { "down", 0, 30 } }) do
+		ebind(mod .. " + " .. d[1],         hl.dsp.focus({ direction = d[1] }), desc("Focus " .. d[1]))
+		ebind(mod .. " + SHIFT + " .. d[1], hl.dsp.window.resize({ x = d[2], y = d[3], relative = true }), desc("Resize", rep))
+	end
+	ebind(mod .. " + mouse:272", hl.dsp.window.drag(),   desc("Move with the mouse", { mouse = true }))   -- move with the mouse
+	ebind(mod .. " + mouse:273", hl.dsp.window.resize(), desc("Resize with the mouse", { mouse = true })) -- resize with the mouse
+	-- workspaces
+	for i = 1, 10 do
+		local key, ws = tostring(i % 10), tostring(i)
+		ebind(mod .. " + " .. key,         hl.dsp.focus({ workspace = ws }),                      desc("Workspace " .. ws))
+		ebind(mod .. " + SHIFT + " .. key, hl.dsp.window.move({ workspace = ws }),                desc("Move window to workspace " .. ws))
+		ebind(mod .. " + ALT + " .. key,   hl.dsp.window.move({ workspace = ws, follow = false }), desc("Send window to workspace " .. ws))
+	end
+	ebind(mod .. " + CTRL + left",        hl.dsp.focus({ workspace = "r-1" }),       desc("Previous workspace"))       -- previous workspace
+	ebind(mod .. " + CTRL + right",       hl.dsp.focus({ workspace = "r+1" }),       desc("Next workspace"))           -- next workspace
+	ebind(mod .. " + CTRL + down",        hl.dsp.focus({ workspace = "empty" }),     desc("First empty workspace"))    -- first empty workspace
+	ebind(mod .. " + CTRL + ALT + left",  hl.dsp.window.move({ workspace = "r-1" }), desc("Move window to the previous workspace")) -- move window back
+	ebind(mod .. " + CTRL + ALT + right", hl.dsp.window.move({ workspace = "r+1" }), desc("Move window to the next workspace"))     -- move window on
+	ebind(mod .. " + mouse_down",         hl.dsp.focus({ workspace = "e+1" }),       desc("Next workspace"))           -- scroll: next workspace
+	ebind(mod .. " + mouse_up",           hl.dsp.focus({ workspace = "e-1" }),       desc("Previous workspace"))       -- scroll: previous workspace
+	-- apps
+	ebind(mod .. " + T",         hl.dsp.exec_cmd(TERMINAL),       desc("Terminal"))      -- terminal
+	ebind(mod .. " + F",         hl.dsp.exec_cmd(BROWSER),        desc("Web browser"))   -- web browser
+	ebind(mod .. " + E",         hl.dsp.exec_cmd("xdg-open " .. os.getenv("HOME")), desc("Files")) -- files
+	-- screenshots (hyprshot; grim for all monitors)
+	ebind(mod .. " + P",         hl.dsp.exec_cmd("hyprshot -m region"),           desc("Screenshot a region"))         -- screenshot a region
+	ebind(mod .. " + CTRL + P",  hl.dsp.exec_cmd("hyprshot -m region -z"),        desc("Screenshot a region, frozen")) -- frozen region
+	ebind(mod .. " + ALT + P",   hl.dsp.exec_cmd("hyprshot -m output -m active"), desc("Screenshot this monitor"))     -- this monitor
+	ebind("Print",               hl.dsp.exec_cmd(SHOT_ALL),                       desc("Screenshot all monitors"))     -- all monitors
+end
+
 function M.media_keys()
 	local hw  = { locked = true, dont_inhibit = true }
 	local hwr = { locked = true, repeating = true, dont_inhibit = true }
-	bind("XF86MonBrightnessUp",   hl.dsp.exec_cmd("sh -c 'qs -c quartz ipc call quartz brightness 5 || brightnessctl -n$(($(brightnessctl max) / 50 + 1)) set 5%+'"), hwr) -- brightness up
-	bind("XF86MonBrightnessDown", hl.dsp.exec_cmd("sh -c 'qs -c quartz ipc call quartz brightness -- -5 || brightnessctl -n$(($(brightnessctl max) / 50 + 1)) set 5%-'"), hwr) -- brightness down
-	bind("XF86AudioMicMute",      hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"), hw) -- mic mute (quartz shows the OSD from Pipewire)
-	bind("XF86AudioPlay",         g("mediaToggle"), hw) -- play / pause
-	bind("XF86AudioNext",         g("mediaNext"),   hw) -- next track
-	bind("XF86AudioPrev",         g("mediaPrev"),   hw) -- previous track
+	bind("XF86MonBrightnessUp",   hl.dsp.exec_cmd("sh -c 'qs -c quartz ipc call quartz brightness 5 || brightnessctl -n$(($(brightnessctl max) / 50 + 1)) set 5%+'"), desc("Brightness up", hwr)) -- brightness up
+	bind("XF86MonBrightnessDown", hl.dsp.exec_cmd("sh -c 'qs -c quartz ipc call quartz brightness -- -5 || brightnessctl -n$(($(brightnessctl max) / 50 + 1)) set 5%-'"), desc("Brightness down", hwr)) -- brightness down
+	bind("XF86AudioMicMute",      hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"), desc("Microphone mute", hw)) -- mic mute (quartz shows the OSD from Pipewire)
+	bind("XF86AudioPlay",         g("mediaToggle"), desc("Play / pause", hw)) -- play / pause
+	bind("XF86AudioNext",         g("mediaNext"),   desc("Next track", hw)) -- next track
+	bind("XF86AudioPrev",         g("mediaPrev"),   desc("Previous track", hw)) -- previous track
 end
 
 function M.volume_keys()
-	bind("XF86AudioMute",        hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"), { locked = true, dont_inhibit = true }) -- mute
-	bind("XF86AudioLowerVolume", hl.dsp.exec_cmd("wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"), { locked = true, repeating = true, dont_inhibit = true }) -- volume down
-	bind("XF86AudioRaiseVolume", hl.dsp.exec_cmd("wpctl set-volume -l 1.5 @DEFAULT_AUDIO_SINK@ 5%+"), { locked = true, repeating = true, dont_inhibit = true }) -- volume up
+	bind("XF86AudioMute",        hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"), desc("Mute", { locked = true, dont_inhibit = true })) -- mute
+	bind("XF86AudioLowerVolume", hl.dsp.exec_cmd("wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"), desc("Volume down", { locked = true, repeating = true, dont_inhibit = true })) -- volume down
+	bind("XF86AudioRaiseVolume", hl.dsp.exec_cmd("wpctl set-volume -l 1.5 @DEFAULT_AUDIO_SINK@ 5%+"), desc("Volume up", { locked = true, repeating = true, dont_inhibit = true })) -- volume up
 end
 
 -- quartz's surfaces are solid (one colour for the bar and the panels hanging
@@ -152,6 +218,7 @@ function M.setup(o)
 	local restart = opt(o, "restart", "sh -c 'qs kill -c quartz; sleep 0.3; " .. qs .. "'")
 	skipped = {}
 	for _, k in ipairs(opt(o, "skip", {})) do skipped[norm(k)] = true end
+	take_over = opt(o, "take_over", false)
 	local drm = opt(o, "drm_devices", nil)
 	if drm then
 		local cards = {}
@@ -162,6 +229,7 @@ function M.setup(o)
 		if #cards > 0 then hl.env("AQ_DRM_DEVICES", table.concat(cards, ":")) end
 	end
 	if opt(o, "binds", true) then M.binds(mod, restart) end
+	if opt(o, "essentials", false) then M.essentials(mod) end
 	if opt(o, "media_keys", true) then M.media_keys() end
 	if opt(o, "volume_keys", true) then M.volume_keys() end
 	if opt(o, "rules", true) then M.rules() end

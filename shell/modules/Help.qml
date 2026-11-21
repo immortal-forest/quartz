@@ -12,10 +12,11 @@ OverlayWin {
     id: win
     name: "help"
     dim: 0.45
+    Component.onCompleted: Binds.refresh()   // only the keys Hyprland really has
 
     property string query: ""
     readonly property bool searching: query.trim().length > 0
-    readonly property var groupsShown: Binds.groups.map(g => ({
+    readonly property var groupsShown: Binds.visibleGroups.map(g => ({
             title: g.title,
             icon: g.icon,
             keys: searching ? g.keys.filter(k => Binds.matches([k[0], g.title, k[2] || "", k[1].join(" ")].join(" "), query)) : g.keys

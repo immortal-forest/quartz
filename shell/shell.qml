@@ -132,6 +132,7 @@ ShellRoot {
     GlobalShortcut { appid: "quartz"; name: "bluetooth"; description: "Bluetooth"; onPressed: Ui.togglePanel("control", "", "bluetooth") }
     GlobalShortcut { appid: "quartz"; name: "sound"; description: "Sound devices + mixer"; onPressed: Ui.togglePanel("control", "", "audio") }
     GlobalShortcut { appid: "quartz"; name: "settings"; description: "quartz settings"; onPressed: Ui.openSettings() }
+    GlobalShortcut { appid: "quartz"; name: "dnd"; description: "Do not disturb on / off"; onPressed: Config.opt.dnd = !Config.opt.dnd }
     GlobalShortcut { appid: "quartz"; name: "help"; description: "Keyboard shortcuts"; onPressed: Ui.toggleOverlay("help") }
     GlobalShortcut { appid: "quartz"; name: "calendar"; description: "Calendar"; onPressed: Ui.togglePanel("calendar") }
     GlobalShortcut { appid: "quartz"; name: "media"; description: "Now playing"; onPressed: Ui.togglePanel("media") }

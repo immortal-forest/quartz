@@ -122,7 +122,10 @@ bind = SUPER, V,      global, quartz:clipboard
 bind = SUPER, ESCAPE, global, quartz:power
 bind = SUPER, A,      global, quartz:control
 bind = SUPER, N,      global, quartz:control
+bind = SUPER SHIFT, N, global, quartz:dnd
 bind = SUPER, K,      global, quartz:wifi
+bind = SUPER, B,      global, quartz:bluetooth
+bind = SUPER SHIFT, A, global, quartz:sound
 bind = SUPER, D,      global, quartz:calendar
 bind = SUPER, M,      global, quartz:media
 bind = SUPER, COMMA,  global, quartz:settings
@@ -150,7 +153,9 @@ hasn't.
 |---|---|
 | Super + Space | Launcher |
 | Super + A / N | Control centre (and notifications) |
-| Super + K | Wi-Fi |
+| Super + Shift + N | Do not disturb on / off |
+| Super + K / B | Wi-Fi / Bluetooth |
+| Super + Shift + A | Sound devices and apps |
 | Super + D | Calendar |
 | Super + M | Now playing |
 | Super + V | Clipboard |
@@ -159,6 +164,12 @@ hasn't.
 | Super + / | Every shortcut, searchable ("wallpaper", "screenshot", "light mode"…) |
 | Super + Esc | Power menu |
 | Super + L | Lock |
+
+With `essentials = true` (the installer turns it on for a fresh Hyprland
+config) quartz also brings a full keymap: Super + Q close, Super + W float,
+Alt + Enter fullscreen, Super + arrows focus, Super + 1–0 workspaces, Super +
+T / F / E terminal, browser, files, Super + P screenshots, and more. Super + /
+lists every key Hyprland really has bound, with a search.
 
 In the bar: click the clock for the calendar, or the status icons for the
 control centre. Scroll on the workspaces to switch, or on the status icons to

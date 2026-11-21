@@ -2,19 +2,27 @@ pragma Singleton
 import QtQuick
 import Quickshell
 
+import Quickshell.Io
+
 // quartz — the keyboard shortcuts shown in the help overlay (Super + /) and in
 // Settings › Shortcuts, plus the settings the help search can jump to. One list,
 // so they never disagree. A bind is [label, keys, search words]. Keys: plain
 // names are drawn as text keycaps; "arrows", "arrows-h" and "icon:<glyph>" as icons.
-// The quartz group mirrors hypr/quartz.lua; the rest mirror the Hyprland
-// keybinds that stay active under quartz.
+// These are quartz's own keys (hypr/quartz.lua: binds + the essentials keymap).
+// `visibleGroups` keeps only the ones Hyprland really has bound (read from
+// `hyprctl binds` when the cheatsheet opens), plus any of the user's own binds
+// that carry a description.
 Singleton {
+    id: root
     readonly property var groups: [
         { title: "quartz", icon: "space_dashboard", keys: [
             ["App launcher", ["Super", "Space"], "apps run open start program search"],
             ["Control centre", ["Super", "A"], "quick settings volume brightness toggles"],
             ["Notifications", ["Super", "N"], "alerts messages history"],
+            ["Do not disturb on / off", ["Super", "Shift", "N"], "dnd quiet silence notifications popups"],
             ["Wi-Fi", ["Super", "K"], "network internet wireless connect"],
+            ["Bluetooth", ["Super", "B"], "bluetooth headphones devices pair connect"],
+            ["Sound devices and apps", ["Super", "Shift", "A"], "sound audio speakers headphones output mixer volume"],
             ["Calendar", ["Super", "D"], "date month day"],
             ["Now playing", ["Super", "M"], "music media player song spotify"],
             ["Clipboard history", ["Super", "V"], "copy paste clip"],
@@ -32,13 +40,10 @@ Singleton {
             ["Fullscreen", ["Alt", "Enter"], "maximise maximize window"],
             ["Group / ungroup", ["Super", "G"], "tabs tabbed window"],
             ["Focus", ["Super", "arrows"], "move focus window direction"],
-            ["Next window", ["Alt", "Tab"], "switch alt tab window"],
             ["Resize", ["Super", "Shift", "arrows"], "size window"],
-            ["Move (floating)", ["Super", "Ctrl", "Shift", "arrows"], "position window"],
             ["Move with the mouse", ["Super", "Left drag"], "drag window"],
             ["Resize with the mouse", ["Super", "Right drag"], "size drag window"],
-            ["Scratchpad", ["Super", "S"], "special hidden workspace"],
-            ["Nap: freeze + stash", ["Super", "Ctrl", "M"], "minimise minimize hide freeze appnap memory swap"]
+            ["Scratchpad", ["Super", "S"], "special hidden workspace"]
         ] },
         { title: "Workspaces", icon: "grid_view", keys: [
             ["Go to 1 – 10", ["Super", "1 – 0"], "switch workspace desktop"],
@@ -50,17 +55,72 @@ Singleton {
             ["Cycle", ["Super", "icon:mouse"], "scroll workspace"]
         ] },
         { title: "Apps & screenshots", icon: "apps", keys: [
-            ["Terminal", ["Super", "T"], "ghostty shell console"],
-            ["Kitty", ["Super", "Shift", "T"], "terminal"],
-            ["Browser", ["Super", "F"], "web zen internet"],
-            ["Firefox", ["Super", "Shift", "F"], "web browser internet"],
+            ["Terminal", ["Super", "T"], "shell console"],
+            ["Web browser", ["Super", "F"], "web internet firefox zen chrome"],
+            ["Files", ["Super", "E"], "file manager folders home"],
             ["Screenshot a region", ["Super", "P"], "capture screen grab picture print"],
             ["Region, frozen screen", ["Super", "Ctrl", "P"], "capture screenshot freeze"],
             ["This monitor", ["Super", "Alt", "P"], "capture screenshot display"],
-            ["All monitors", ["Print"], "capture screenshot print screen"],
-            ["Quit Hyprland", ["Super", "Delete"], "exit log out session"]
+            ["All monitors", ["Print"], "capture screenshot print screen"]
         ] }
     ]
+
+    // ── what Hyprland really has bound ────────────────────────────────────────
+    property var live: null          // "modmask|key" → true; null until read (then everything shows)
+    property var described: []       // the user's own binds with a description: [label, keys, ""]
+    function refresh() { reader.running = true; }
+    Process {
+        id: reader
+        command: ["hyprctl", "binds", "-j"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const map = {}, own = [];
+                    for (const b of JSON.parse(text)) {
+                        if (b.submap)
+                            continue;
+                        map[b.modmask + "|" + String(b.key).toLowerCase()] = true;
+                        const d = b.description || "";
+                        if (d.length && !d.startsWith("quartz:"))
+                            own.push([d, root.labels(b.modmask, b.key), d]);
+                    }
+                    root.live = map;
+                    root.described = own;
+                } catch (e) {}
+            }
+        }
+    }
+    // a cheatsheet key list → the bind Hyprland would have for it
+    function combo(keys) {
+        let mask = 0, key = "";
+        for (const k of keys) {
+            if (k === "Super") mask |= 64;
+            else if (k === "Shift") mask |= 1;
+            else if (k === "Ctrl") mask |= 4;
+            else if (k === "Alt") mask |= 8;
+            else key = ({ "Esc": "escape", ",": "comma", "/": "slash", "Enter": "return", "1 – 0": "1",
+                          "arrows": "left", "arrows-h": "left", "Left drag": "mouse:272", "Right drag": "mouse:273",
+                          "icon:mouse": "mouse_down", "icon:keyboard_arrow_down": "down" })[k] ?? k.toLowerCase();
+        }
+        return mask + "|" + key;
+    }
+    function bound(keys) { return !root.live || !!root.live[root.combo(keys)]; }
+    // modmask + key → keycap labels (for the user's own described binds)
+    function labels(mask, key) {
+        const out = [];
+        if (mask & 64) out.push("Super");
+        if (mask & 4) out.push("Ctrl");
+        if (mask & 8) out.push("Alt");
+        if (mask & 1) out.push("Shift");
+        const k = String(key);
+        out.push(({ "comma": ",", "slash": "/", "escape": "Esc", "return": "Enter", "mouse:272": "Left drag", "mouse:273": "Right drag",
+                    "mouse_down": "icon:mouse", "mouse_up": "icon:mouse", "left": "icon:keyboard_arrow_left", "right": "icon:keyboard_arrow_right",
+                    "up": "icon:keyboard_arrow_up", "down": "icon:keyboard_arrow_down" })[k.toLowerCase()] ?? (k.length === 1 ? k.toUpperCase() : k));
+        return out;
+    }
+    readonly property var visibleGroups: groups.map(g => ({ title: g.title, icon: g.icon, keys: g.keys.filter(k => root.bound(k[1])) }))
+        .filter(g => g.keys.length > 0)
+        .concat(described.length ? [{ title: "Other shortcuts", icon: "keyboard_command_key", keys: described }] : [])
 
     // settings the help search can open (section = Settings window page)
     readonly property var settings: [

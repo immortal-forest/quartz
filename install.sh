@@ -281,7 +281,10 @@ SUPER + V|bind = SUPER, V, global, quartz:clipboard|clipboard history
 SUPER + ESCAPE|bind = SUPER, ESCAPE, global, quartz:power|power menu
 SUPER + A|bind = SUPER, A, global, quartz:control|control centre
 SUPER + N|bind = SUPER, N, global, quartz:control|notifications
+SUPER + SHIFT + N|bind = SUPER SHIFT, N, global, quartz:dnd|do not disturb
 SUPER + K|bind = SUPER, K, global, quartz:wifi|Wi-Fi
+SUPER + B|bind = SUPER, B, global, quartz:bluetooth|Bluetooth
+SUPER + SHIFT + A|bind = SUPER SHIFT, A, global, quartz:sound|sound devices and apps
 SUPER + D|bind = SUPER, D, global, quartz:calendar|calendar
 SUPER + M|bind = SUPER, M, global, quartz:media|now playing
 SUPER + COMMA|bind = SUPER, COMMA, global, quartz:settings|settings
@@ -378,6 +381,8 @@ find_conflicts() {
 		ok "None of quartz's keys clash with yours$([ $src = static ] && echo " (checked your config files: $why)")."
 		return
 	fi
+	# a fresh copy of Hyprland's example: choose_keymap hands these keys to quartz
+	[ "$fresh" = 1 ] && [ "$hypr_mode" = lua ] && return
 	warn "These keys already do something in your config, so quartz leaves them to you:"
 	local i
 	for i in "${!skip_keys[@]}"; do
@@ -386,6 +391,31 @@ find_conflicts() {
 	note "Pressing one would otherwise do both things at once. To hand a key to quartz,"
 	note "remove it from your config and run this installer again."
 	[ $src = static ] && note "(Checked your config files because $why; run this again inside Hyprland for an exact check.)"
+}
+
+# quartz's full keymap (windows, workspaces, apps, screenshots): on for a
+# fresh copy of Hyprland's example, asked otherwise. With it, quartz's keys
+# replace the config's binds on the same keys, so nothing is skipped.
+choose_keymap() {
+	[ "$hypr_mode" = lua ] || return 0
+	if [ "$fresh" = 1 ]; then
+		keymap=1
+		ok "Fresh setup: quartz brings a full keymap (windows, workspaces, apps, screenshots)."
+		if [ ${#skip_keys[@]} -gt 0 ]; then
+			note "It replaces what Hyprland's example had on these keys:"
+			local i
+			for i in "${!skip_keys[@]}"; do note "$(printf '%-22s %s' "$(pretty_key "${skip_keys[$i]}")" "${skip_labels[$i]}")"; done
+		fi
+		skip_keys=()
+		return
+	fi
+	act "quartz also has a full keymap for windows, workspaces, apps and screenshots,"
+	note "the one its cheatsheet (Super + /) shows. Using it replaces your own binds"
+	note "on the same keys (yours stay in your config, quartz's block just comes last)."
+	if ask "Use quartz's full keymap?" n; then
+		keymap=1
+		skip_keys=()
+	fi
 }
 
 # ── the block this installer adds ───────────────────────────────────────────
@@ -452,6 +482,10 @@ make_block() {
 	echo "			clipboard = $clip,$([ $clip = false ] && echo " -- your config already runs cliphist")"
 	[ "${hw_gpu:-0}" = 1 ] && echo "			gpu = \"integrated\", -- quartz runs on the integrated GPU (Mesa)"
 	[ "${hw_drm:-0}" = 1 ] && echo "			drm_devices = { \"$igpu_pci\", \"$nv_pci\" }, -- the first one renders the desktop"
+	if [ "$keymap" = 1 ]; then
+		echo "			essentials = true, -- windows, workspaces, apps, screenshots"
+		echo "			take_over = true, -- quartz's keys replace earlier binds on the same keys"
+	fi
 	if [ ${#skip_keys[@]} -gt 0 ]; then
 		printf '\t\t\tskip = {'
 		printf ' "%s",' "${skip_keys[@]}"
@@ -898,6 +932,7 @@ hyprland() {
 		act "You don't have a Hyprland config yet. Hyprland ships an example: its default setup."
 		if ask "Copy it to $(pretty "$hypr_file") and add quartz to it?" y; then
 			run mkdir -p "$hypr_dir" && run cp "$example" "$hypr_file"
+			fresh=1
 		else
 			note "Then add this to your Hyprland config yourself:"
 			say ""
@@ -920,6 +955,7 @@ hyprland() {
 		return
 	fi
 	find_conflicts
+	choose_keymap
 	[ "$user_clip" = 1 ] && ok "Your config already starts cliphist, so quartz's block doesn't start it again."
 	blk=$(mktemp)
 	make_block >"$blk"
@@ -1155,7 +1191,7 @@ if [ $mode = uninstall ]; then
 	exit 0
 fi
 
-skip_keys=() user_clip=0 elsewhere=""
+skip_keys=() user_clip=0 elsewhere="" fresh=0 keymap=0
 [ "$hypr_mode" != none ] && scan_hypr
 step "Checking what quartz needs"
 check_deps

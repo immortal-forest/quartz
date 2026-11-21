@@ -1,116 +1,99 @@
+<div align="center">
+
 # quartz
 
-A light, calm desktop shell for **Hyprland**, built with **Quickshell**. One
-floating bar, and panels that unfold out of it: each one hangs right under the
-bar item that opened it and joins the bar as one surface. Everything else stays
-out of the way until you call it. The whole shell takes its colours from your
-wallpaper.
+A calm, complete desktop shell for [Hyprland](https://hyprland.org), built with [Quickshell](https://quickshell.org).
 
-## What you get
+</div>
 
-- **Floating bar**, lined up with your window gaps: workspaces (numbered, or
-  dots), the focused window, the clock, what's playing, the tray and your
-  status icons. Click one and its panel unfolds from right under it.
-- **Control centre**: volume and brightness sliders, tiles for Wi-Fi,
-  Bluetooth, microphone, Do not disturb and Stay awake. Pages for:
-  - **Wi-Fi**: connect, type a password, forget
-  - **Bluetooth**: pair, connect, see battery
-  - **Sound**: output and input volume, devices, volume per app
-- **Notifications**: pop-ups that pause while you hover them, with action
-  buttons and swipe-to-dismiss. Screenshots show a preview with Open / Copy /
-  Delete. Critical ones are tinted red and stay until handled. The history
-  lives in the control centre.
-- **Launcher**: fuzzy app search. Type a sum and Enter copies the answer. Apps
-  you open often float to the top.
-- **Clipboard history** with image previews.
-- **Wallpaper picker**:
-  - folders as filters, search and *Surprise me*
-  - the new wallpaper grows out from where you clicked
-  - the whole shell recolours to match (Material 3, via matugen)
-- **Lock screen**: blurred wallpaper, a big clock, what's playing, and a
-  password field. It also locks on `loginctl lock-session`, so idle and suspend
-  lock it too.
-- **More panels**: calendar, now playing (with seeking), a power menu, and an
-  on-screen indicator for volume, brightness and mic.
-- **Light**: a panel only exists while it's open. At rest quartz uses about 1%
-  of one CPU core and about 60 MB of its own memory.
-- **Settings window**: a small app window (General, Appearance, Wallpaper,
-  Shortcuts) instead of a page buried in a panel.
-- **One design system**: every surface is built from the same sizes, radii,
-  type scale (Outfit) and colour roles in `shell/core/Theme.qml`.
+![quartz: the bar and the control centre](.github/assets/hero.jpg)
 
-## Requirements
+<table>
+  <tr>
+    <td><img src=".github/assets/launcher.jpg" alt="App launcher"></td>
+    <td><img src=".github/assets/notifications.jpg" alt="Notifications"></td>
+  </tr>
+  <tr>
+    <td><img src=".github/assets/settings.jpg" alt="Settings"></td>
+    <td><img src=".github/assets/cheatsheet.jpg" alt="Keyboard shortcuts"></td>
+  </tr>
+  <tr>
+    <td><img src=".github/assets/wallpapers.jpg" alt="Wallpaper picker"></td>
+    <td><img src=".github/assets/lock.jpg" alt="Lock screen"></td>
+  </tr>
+</table>
 
-| What | Arch package |
-|---|---|
-| Hyprland, Lua or classic config | `hyprland` |
-| Quickshell ≥ 0.3 | `quickshell` |
-| Colours from the wallpaper | `matugen` |
-| Wallpapers | `awww` (without it, quartz hands wallpaper changes to `setwall` if you have one), `ffmpeg` (picker thumbnails) |
-| Clipboard | `wl-clipboard`, `cliphist` |
-| Brightness | `brightnessctl` |
-| Audio | `wireplumber` (PipeWire) |
-| Wi-Fi / Bluetooth / battery | `networkmanager`, `bluez`, `upower` |
-| Lock screen | `glib2`, `systemd`, `util-linux` (already on almost every system) |
-| Fonts | `ttf-material-symbols-variable` and [Outfit](https://fonts.google.com/specimen/Outfit) |
-| Optional | `hyprshot` (screenshot button), `playerctl`, `hyprsunset` (Night light), `power-profiles-daemon` (Power mode) |
+## Features
+
+- **Bar**: workspaces, the window you're in, the clock, what's playing, the tray and your status icons.
+- **Panels from the bar**: the control centre, calendar, now playing and tray menus unfold right under what you clicked.
+- **Control centre**: volume, brightness, Wi-Fi, Bluetooth, sound devices, do not disturb and your notifications.
+- **Notifications**: pop-ups with their actions, and screenshots with a preview and Open / Copy / Delete.
+- **Launcher**: fuzzy app search; type a sum and Enter copies the answer.
+- **Clipboard history**: text and images, searchable.
+- **Wallpapers**: a picker with folders and search; the whole desktop takes the new wallpaper's colours.
+- **Settings**: light or dark, accent colour, corners, motion, text size, bar items, night light and power mode.
+- **Shortcuts**: Super + / lists every key, searchable, with links to the matching settings.
+- **Lock screen, power menu and on-screen volume and brightness.**
+- **Light**: nothing runs at rest, and a panel only exists while it's open.
 
 ## Install
 
 ```sh
 git clone https://github.com/immortal-forest/quartz ~/quartz
-~/quartz/install.sh
+cd ~/quartz && ./install.sh
 ```
 
-The installer walks through eight steps, says what each one does and asks
-before it changes anything:
+The installer explains each step and asks before it changes anything:
 
-1. Checks the programs and fonts above.
-2. Looks at your processor and graphics chips and suggests what suits them:
-   microcode, the video-decoding driver, NVIDIA's settings, and on a hybrid
-   laptop the built-in GPU for the desktop and quartz (`prime-run` for games).
-3. On Arch, offers to install what's missing (`sudo pacman -S --needed …`, AUR
-   packages through `yay` or `paru` if you have one). It shows each command
-   first. On other distros it lists the packages and carries on.
-4. Downloads the Outfit font into `~/.local/share/fonts` if it's missing.
-5. Links `shell/` to `~/.config/quickshell/quartz`. Anything already there is
-   moved aside, not deleted.
-6. Adds quartz to your Hyprland config, `hyprland.lua` or `hyprland.conf`. It
-   backs the file up first and puts everything in one block between
-   `>>> quartz >>>` marker lines, so you can see it and it never repeats. Keys
-   your config already uses stay yours: quartz skips them and lists them.
-7. Asks for your wallpaper folder (default `~/wallpapers`) and writes it to
-   `~/.local/state/quartz/config.json`, but only if that file doesn't exist yet.
+1. Checks the programs and fonts quartz needs.
+2. Looks at your processor and graphics and suggests what suits them: microcode, video decoding, NVIDIA settings, and on a hybrid laptop the built-in GPU for the desktop.
+3. On Arch, installs only what's missing (pacman, and yay or paru for AUR packages), showing each command first. Other distros get the list.
+4. Downloads the Outfit font if it's missing.
+5. Links the shell to `~/.config/quickshell/quartz`. Anything already there is moved aside.
+6. Adds quartz to your Hyprland config in one marked block, backed up first. A fresh config gets quartz's full keymap; an existing one keeps your keys.
+7. Asks for your wallpaper folder.
 8. Reloads Hyprland and starts quartz.
 
-Running it again only does what isn't done yet.
+It's safe to run again: it only does what isn't done yet.
 
 | Option | |
 |---|---|
 | `--dry-run` | show every step and command, change nothing |
-| `--yes` | don't ask, take the default answer each time |
-| `--uninstall` | remove the link and the Hyprland block. Packages, fonts, settings and wallpapers stay. |
-| `--help` | the short version of this |
+| `--yes` | take the default answer to every question |
+| `--uninstall` | remove the link and the Hyprland block; packages, fonts and settings stay |
+| `--help` | the short version |
 
-To set things up by hand instead, use one of the snippets below.
+### Requirements
 
-### Lua config (`hyprland.lua`)
+Arch packages; the installer finds them for you.
+
+| For | Package |
+|---|---|
+| The shell | `hyprland`, `quickshell` |
+| Colours from the wallpaper | `matugen` |
+| Wallpapers | `awww`, `ffmpeg` |
+| Clipboard | `wl-clipboard`, `cliphist` |
+| Brightness, audio | `brightnessctl`, `wireplumber` |
+| Wi-Fi, Bluetooth, battery | `networkmanager`, `bluez`, `upower` |
+| Fonts | `ttf-material-symbols-variable`, [Outfit](https://fonts.google.com/specimen/Outfit) |
+| Nice to have | `hyprshot`, `playerctl`, `hyprsunset` (night light), `power-profiles-daemon` (power mode) |
+
+### Without the installer
+
+With a Lua config (`hyprland.lua`):
 
 ```lua
 local quartz = dofile(os.getenv("HOME") .. "/quartz/hypr/quartz.lua")
 quartz.setup({ mod = "SUPER", autostart = true, clipboard = true })
 ```
 
-This binds the keys below and adds quartz's layer rules: no Hyprland animations
-on its surfaces, frost behind the power menu, and the settings window floated,
-centred and borderless. It also starts quartz and the clipboard-history watchers
-with Hyprland. The options are at the top of [`hypr/quartz.lua`](hypr/quartz.lua).
-You can pick another modifier, skip the media or volume keys, or skip autostart.
-`skip = { "SUPER + C" }` leaves a key to your own config. On a hybrid laptop,
-`gpu = "integrated"` runs quartz on the built-in GPU, and
-`drm_devices = { "<pci>", … }` sets which GPU draws the desktop.
+Add `essentials = true` for quartz's full keymap (windows, workspaces, apps,
+screenshots) and `take_over = true` to let it replace your own binds on the
+same keys. Every option is listed at the top of
+[`hypr/quartz.lua`](hypr/quartz.lua).
 
-### Classic `hyprland.conf`
+With a classic config (`hyprland.conf`):
 
 ```ini
 exec-once = qs -c quartz -d
@@ -151,83 +134,61 @@ hasn't.
 
 | Key | |
 |---|---|
-| Super + Space | Launcher |
-| Super + A / N | Control centre (and notifications) |
+| Super + Space | App launcher |
+| Super + A | Control centre |
+| Super + N | Notifications |
 | Super + Shift + N | Do not disturb on / off |
 | Super + Shift + W | Wi-Fi |
 | Super + B | Bluetooth |
 | Super + Shift + A | Sound devices and apps |
 | Super + D | Calendar |
 | Super + M | Now playing |
-| Super + V | Clipboard |
-| Super + C / Shift+C | Wallpapers / a random one |
+| Super + V | Clipboard history |
+| Super + C | Wallpaper picker |
+| Super + Shift + C | Random wallpaper |
 | Super + , | Settings |
-| Super + / | Every shortcut, searchable ("wallpaper", "screenshot", "light mode"…) |
+| Super + / | Every shortcut, searchable |
 | Super + Esc | Power menu |
 | Super + L | Lock |
 
-With `essentials = true` (the installer turns it on for a fresh Hyprland
-config) quartz also brings a full keymap: Super + Q close, Super + W float,
-Alt + Enter fullscreen, Super + arrows focus, Super + 1–0 workspaces, Super +
-T / F / E terminal, browser, files, Super + P screenshots, and more. Super + /
-lists every key Hyprland really has bound, with a search.
+With the full keymap there's also Super + Q to close, Super + W to float,
+Alt + Enter for fullscreen, Super + 1–0 for workspaces, Super + T / F / E for
+the terminal, browser and files, and Super + P for screenshots. Super + / shows
+everything that's really bound.
 
-In the bar: click the clock for the calendar, or the status icons for the
+In the bar, click the clock for the calendar and the status icons for the
 control centre. Scroll on the workspaces to switch, or on the status icons to
-change the volume. Right-click a tray icon for its menu.
+change the volume.
 
 ## Settings
 
-Open the settings window from the gear in the control centre, or Super + , .
-Every option says in plain words what it does, and the search box finds any of
-them. The first time quartz starts, a short welcome guide shows the six keys
-that get you around (Settings › General brings it back).
-
-- **General**: 24-hour clock, seconds, which day the week starts on, stay
-  awake, lock now, what's playing on the lock screen, your terminal, the
-  welcome guide and the shortcut cheatsheet
-- **Appearance**: light or dark, accent colour (from the wallpaper or one of
-  eight), colour style, corners (square / rounded / round), motion (full /
-  reduced / off), text size, theme your apps from the wallpaper
-- **Bar**: numbered workspaces or dots, window title, what's playing, date,
-  battery percentage
-- **Notifications**: do not disturb, how long pop-ups stay, clear them all
-- **Sound & display**: volume, microphone, output device, brightness, night
-  light (needs `hyprsunset`), power mode (needs `power-profiles-daemon`),
-  Wi-Fi and Bluetooth
-- **Wallpaper**: change it, change it automatically (15 min / 30 min / 1 h),
-  the folder, the transition
-- **Shortcuts** and **About** (where settings live, reset all, restart quartz)
-
-Everything is saved in `~/.local/state/quartz/config.json`.
-
-*Theme apps from the wallpaper* runs your own matugen config on each new
-wallpaper, so any templates you have there (terminals, borders, …) follow
-along.
+Super + , opens the settings window. Every option says what it does, and the
+search box finds any of them. The first time quartz starts, a short welcome
+guide shows the keys that get you around. Settings are saved in
+`~/.local/state/quartz/config.json`.
 
 ## Scripting
 
 ```sh
-qs -c quartz ipc call quartz launcher            # also: clipboard, power, wallpapers, lock, close
-qs -c quartz ipc call quartz panel control:wifi  # control[:wifi|bluetooth|audio|settings], calendar, media
-qs -c quartz ipc call quartz setWallpaper ~/wallpapers/x.jpg
-qs -c quartz ipc call quartz randomWallpaper
-qs -c quartz ipc call quartz volume 5            # brightness 5, mic, dnd
+qs -c quartz ipc call quartz launcher                 # also: clipboard, power, wallpapers, help, settings, lock, close
+qs -c quartz ipc call quartz panel control:bluetooth  # control[:wifi|bluetooth|audio], calendar, media
+qs -c quartz ipc call quartz setWallpaper ~/wallpapers/sea.jpg
+qs -c quartz ipc call quartz volume 5                 # also: brightness 5, mic, dnd, randomWallpaper
 ```
 
-## Notes
+## Updating
 
-- The lock screen checks your password with the PAM service `login`.
-- If quartz dies while locked, the screen stays locked. That's the session-lock
-  protocol doing its job.
-- Caches live in `~/.cache/quartz` and look after themselves:
-  - `thumbs/`: 480 px wallpaper thumbnails, keyed by path and modification
-    time. Only missing ones are made (low priority, in the background); ones
-    for deleted or changed wallpapers are removed.
-  - `palettes/`: the colours matugen worked out per wallpaper, mode, style and
-    accent, so switching back is instant. The newest 200 are kept.
-  - `clip/`: small JPEG previews of clipboard images, removed once the entry
-    leaves your clipboard history.
-- At rest quartz does nothing: no polling, no timers, no redraws. The control
-  centre is built once in the background so it opens smoothly, and is unmapped
-  while hidden.
+```sh
+cd ~/quartz && git pull && ./install.sh
+```
+
+## Credits
+
+[Quickshell](https://quickshell.org) ·
+[Hyprland](https://hyprland.org) ·
+[matugen](https://github.com/InioX/matugen) ·
+[Material Symbols](https://fonts.google.com/icons) ·
+[Outfit](https://fonts.google.com/specimen/Outfit) ·
+[awww](https://codeberg.org/LGFae/awww) ·
+[cliphist](https://github.com/sentriz/cliphist) ·
+[hyprshot](https://github.com/Gustash/Hyprshot)

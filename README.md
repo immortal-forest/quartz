@@ -123,7 +123,7 @@ bind = SUPER, ESCAPE, global, quartz:power
 bind = SUPER, A,      global, quartz:control
 bind = SUPER, N,      global, quartz:control
 bind = SUPER SHIFT, N, global, quartz:dnd
-bind = SUPER, K,      global, quartz:wifi
+bind = SUPER SHIFT, W, global, quartz:wifi
 bind = SUPER, B,      global, quartz:bluetooth
 bind = SUPER SHIFT, A, global, quartz:sound
 bind = SUPER, D,      global, quartz:calendar
@@ -154,7 +154,8 @@ hasn't.
 | Super + Space | Launcher |
 | Super + A / N | Control centre (and notifications) |
 | Super + Shift + N | Do not disturb on / off |
-| Super + K / B | Wi-Fi / Bluetooth |
+| Super + Shift + W | Wi-Fi |
+| Super + B | Bluetooth |
 | Super + Shift + A | Sound devices and apps |
 | Super + D | Calendar |
 | Super + M | Now playing |

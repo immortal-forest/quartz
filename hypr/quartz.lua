@@ -97,7 +97,7 @@ function M.binds(mod, restart)
 	bind(mod .. " + A",         g("control"),         desc("Control centre"))            -- control centre
 	bind(mod .. " + N",         g("control"),         desc("Notifications"))             -- notifications live in the control centre
 	bind(mod .. " + SHIFT + N", g("dnd"),             desc("Do not disturb on / off"))   -- do not disturb
-	bind(mod .. " + K",         g("wifi"),            desc("Wi-Fi"))                     -- control centre › Wi-Fi
+	bind(mod .. " + SHIFT + W", g("wifi"),            desc("Wi-Fi"))                     -- control centre › Wi-Fi
 	bind(mod .. " + B",         g("bluetooth"),       desc("Bluetooth"))                 -- control centre › Bluetooth
 	bind(mod .. " + SHIFT + A", g("sound"),           desc("Sound devices and apps"))    -- control centre › Sound
 	bind(mod .. " + D",         g("calendar"),        desc("Calendar"))                  -- calendar

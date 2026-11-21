@@ -20,7 +20,7 @@ Singleton {
             ["Control centre", ["Super", "A"], "quick settings volume brightness toggles"],
             ["Notifications", ["Super", "N"], "alerts messages history"],
             ["Do not disturb on / off", ["Super", "Shift", "N"], "dnd quiet silence notifications popups"],
-            ["Wi-Fi", ["Super", "K"], "network internet wireless connect"],
+            ["Wi-Fi", ["Super", "Shift", "W"], "network internet wireless connect"],
             ["Bluetooth", ["Super", "B"], "bluetooth headphones devices pair connect"],
             ["Sound devices and apps", ["Super", "Shift", "A"], "sound audio speakers headphones output mixer volume"],
             ["Calendar", ["Super", "D"], "date month day"],

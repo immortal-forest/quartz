@@ -1176,7 +1176,13 @@ hyprland() {
 		fi
 	fi
 	# idle: dim, lock, screen off, sleep (the clean config starts hypridle with it)
+	local idle_before
+	idle_before=$(cat "$hypr_dir/hypridle.conf" 2>/dev/null)
 	place_config "$here/config/hypr/hypridle.conf" "$hypr_dir/hypridle.conf" "a hypridle config (dim 5 min, lock 10, screen off 15, sleep 30)" || true
+	# hypridle reads its config only when it starts
+	if [ $dry -eq 0 ] && [ "$(cat "$hypr_dir/hypridle.conf" 2>/dev/null)" != "$idle_before" ] && pgrep -x hypridle >/dev/null && hypr_running; then
+		run_q pkill -x hypridle && run_q setsid -f hypridle && ok "Restarted hypridle with the new config."
+	fi
 	scan_hypr
 	ok "Your Hyprland config: $(pretty "$hypr_file") ($([ "$hypr_mode" = lua ] && echo "Lua" || echo "classic") format)"
 	if [ -n "$elsewhere" ]; then

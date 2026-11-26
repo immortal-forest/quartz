@@ -33,6 +33,7 @@ FloatingWindow {
     readonly property var sections: [
         { key: "general", icon: "tune", label: "General", about: "The clock and calendar, the lock screen, your terminal and where to find help" },
         { key: "appearance", icon: "palette", label: "Appearance", about: "Light or dark, your accent colour, corners, motion and how big text is" },
+        { key: "desktop", icon: "desktop_windows", label: "Display & input", about: "Screen scale, text size in apps and the terminal, the cursor, your keyboard layout and the touchpad" },
         { key: "bar", icon: "toolbar", label: "Bar", about: "Choose what the bar at the top shows" },
         { key: "notifications", icon: "notifications", label: "Notifications", about: "Pop-ups, quiet time and the notification history" },
         { key: "sound", icon: "volume_up", label: "Sound & display", about: "Volume, microphone, brightness, night light, power mode, Wi-Fi and Bluetooth" },
@@ -596,6 +597,141 @@ FloatingWindow {
                     }
                 }
 
+                // ── Display & input ──
+                Repeater {
+                    model: win.section === "desktop" ? Desktop.screens : []
+                    delegate: Group {
+                        id: scr
+                        required property string modelData
+                        title: Desktop.screens.length > 1 ? "Screen scale · " + scr.modelData : "Screen scale"
+                        Choices {
+                            options: [[0, "Auto"], [1, "100%"], [1.25, "125%"], [1.5, "150%"], [1.75, "175%"], [2, "200%"]]
+                            value: Desktop.scaleOf(scr.modelData)
+                            onPicked: v => Desktop.setScale(scr.modelData, v)
+                        }
+                    }
+                }
+                Group {
+                    visible: win.section === "desktop"
+                    title: "Text size"
+                    SettingRow {
+                        icon: "format_size"
+                        title: "In apps"
+                        subtitle: "GTK apps: files, dialogs, settings windows. quartz's own text is under Appearance"
+                        RowLayout {
+                            spacing: 6
+                            Repeater {
+                                model: [[1.0, "Default"], [1.15, "Large"], [1.3, "Larger"]]
+                                delegate: Chip {
+                                    required property var modelData
+                                    small: true
+                                    text: modelData[1]
+                                    selected: Math.abs(Config.opt.appText - modelData[0]) < 0.01
+                                    onClicked: { Config.opt.appText = modelData[0]; Desktop.appText(); }
+                                }
+                            }
+                        }
+                    }
+                    Divider {}
+                    SettingRow {
+                        icon: "terminal"
+                        title: "In the terminal"
+                        subtitle: "Ghostty's text size"
+                        RowLayout {
+                            spacing: 6
+                            Repeater {
+                                model: [[11, "11"], [13, "13"], [15, "15"], [17, "17"]]
+                                delegate: Chip {
+                                    required property var modelData
+                                    small: true
+                                    text: modelData[1]
+                                    selected: Config.opt.termFont === modelData[0]
+                                    onClicked: { Config.opt.termFont = modelData[0]; Desktop.termFont(); }
+                                }
+                            }
+                        }
+                    }
+                }
+                Group {
+                    visible: win.section === "desktop"
+                    title: "Cursor"
+                    SettingRow {
+                        icon: "arrow_selector_tool"
+                        title: "Cursor size"
+                        subtitle: "quartz's cursor, in every app"
+                        RowLayout {
+                            spacing: 6
+                            Repeater {
+                                model: [[24, "Small"], [32, "Medium"], [48, "Large"]]
+                                delegate: Chip {
+                                    required property var modelData
+                                    small: true
+                                    text: modelData[1]
+                                    selected: Config.opt.cursorSize === modelData[0]
+                                    onClicked: { Config.opt.cursorSize = modelData[0]; Desktop.hypr(); }
+                                }
+                            }
+                        }
+                    }
+                }
+                Group {
+                    visible: win.section === "desktop"
+                    title: "Keyboard"
+                    SettingRow {
+                        icon: "keyboard"
+                        title: "Layout"
+                        subtitle: "Like us, de or fr. Two or more, like us,ru: Alt + Shift switches between them"
+                        Field {
+                            implicitWidth: 160
+                            placeholder: "us"
+                            text: Config.opt.kbLayout
+                            input.onEditingFinished: {
+                                const t = text.trim().replace(/\s+/g, "");
+                                if (t !== Config.opt.kbLayout) {
+                                    Config.opt.kbLayout = t;
+                                    Desktop.hypr();
+                                }
+                            }
+                        }
+                    }
+                }
+                Group {
+                    visible: win.section === "desktop"
+                    title: "Touchpad & mouse"
+                    SettingRow {
+                        icon: "swipe_vertical"
+                        title: "Natural scrolling"
+                        subtitle: "The page follows your fingers, like on a phone"
+                        Switch { checked: Config.opt.naturalScroll; onToggled: { Config.opt.naturalScroll = !Config.opt.naturalScroll; Desktop.hypr(); } }
+                    }
+                    Divider {}
+                    SettingRow {
+                        icon: "touch_app"
+                        title: "Tap to click"
+                        subtitle: "A tap on the touchpad clicks"
+                        Switch { checked: Config.opt.tapToClick; onToggled: { Config.opt.tapToClick = !Config.opt.tapToClick; Desktop.hypr(); } }
+                    }
+                    Divider {}
+                    SettingRow {
+                        icon: "speed"
+                        title: "Pointer speed"
+                        subtitle: "How fast the pointer moves"
+                        RowLayout {
+                            spacing: 6
+                            Repeater {
+                                model: [[-0.4, "Slow"], [0, "Normal"], [0.4, "Fast"]]
+                                delegate: Chip {
+                                    required property var modelData
+                                    small: true
+                                    text: modelData[1]
+                                    selected: Math.abs(Config.opt.pointerSpeed - modelData[0]) < 0.01
+                                    onClicked: { Config.opt.pointerSpeed = modelData[0]; Desktop.hypr(); }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // ── Bar ──
                 Group {
                     visible: win.section === "bar"
@@ -927,6 +1063,7 @@ FloatingWindow {
                                 onClicked: {
                                     if (win.confirmReset) {
                                         Config.reset();
+                                        Desktop.applyAll();
                                         win.confirmReset = false;
                                     } else {
                                         win.confirmReset = true;

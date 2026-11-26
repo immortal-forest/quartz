@@ -30,6 +30,8 @@
 --   cursor       cursor theme for Hyprland, apps and GTK, e.g. "Bibata-Modern-Ice"
 --                (quartz's, in cursors/; install.sh unpacks it)  (default: leave the cursor alone)
 --   cursor_size  cursor size in pixels                    (default 24)
+--   prefs        apply Settings › Display & input (screen scale, keyboard, touchpad,
+--                cursor size) from ~/.local/state/quartz/hyprland.lua  (default true)
 --   colors       window borders in the wallpaper's colours, from the file
 --                quartz's matugen config writes (~/.config/hypr/quartz-colors.lua)  (default true)
 --
@@ -199,6 +201,27 @@ function M.cursor(theme, size)
 	hl.exec_cmd("gsettings set org.gnome.desktop.interface cursor-theme '" .. theme .. "'; gsettings set org.gnome.desktop.interface cursor-size " .. size)
 end
 
+-- Settings › Display & input: screen scale, keyboard, touchpad and cursor
+-- size, written by quartz to ~/.local/state/quartz/hyprland.lua (a table).
+function M.prefs()
+	local ok, p = pcall(dofile, os.getenv("HOME") .. "/.local/state/quartz/hyprland.lua")
+	if not ok or type(p) ~= "table" then return {} end
+	for name, scale in pairs(p.monitors or {}) do
+		hl.monitor({ output = name, mode = "preferred", position = "auto", scale = scale })
+	end
+	local input, touchpad = {}, {}
+	if type(p.kb_layout) == "string" and p.kb_layout ~= "" then
+		input.kb_layout = p.kb_layout
+		if p.kb_layout:find(",") then input.kb_options = "grp:alt_shift_toggle" end
+	end
+	if type(p.sensitivity) == "number" then input.sensitivity = p.sensitivity end
+	if p.natural_scroll ~= nil then touchpad.natural_scroll = p.natural_scroll end
+	if p.tap_to_click ~= nil then touchpad.tap_to_click = p.tap_to_click end
+	if next(touchpad) then input.touchpad = touchpad end
+	if next(input) then hl.config({ input = input }) end
+	return p
+end
+
 -- Window borders in the wallpaper's colours: matugen writes them (quartz's
 -- config/matugen) whenever the wallpaper changes, then reloads Hyprland.
 function M.colors()
@@ -260,8 +283,9 @@ function M.setup(o)
 		end
 		if #cards > 0 then hl.env("AQ_DRM_DEVICES", table.concat(cards, ":")) end
 	end
+	local prefs = opt(o, "prefs", true) and M.prefs() or {}
 	local cursor = opt(o, "cursor", nil)
-	if cursor then M.cursor(cursor, opt(o, "cursor_size", 24)) end
+	if cursor then M.cursor(cursor, prefs.cursor_size or opt(o, "cursor_size", 24)) end
 	if opt(o, "binds", true) then M.binds(mod, restart) end
 	if opt(o, "essentials", false) then M.essentials(mod) end
 	if opt(o, "media_keys", true) then M.media_keys() end

@@ -1390,6 +1390,15 @@ uninstall() {
 		done
 	fi
 	if recorded file "$cfg_home/starship.toml" && [ -d "$HOME/.cache/starship" ]; then run rm -rf -- "$HOME/.cache/starship"; fi
+	# Settings › Display & input: Ghostty's text size file, GTK's text size and quartz's cursor
+	if recorded file "$cfg_home/ghostty/config" && [ -e "$cfg_home/ghostty/quartz-settings" ]; then run rm -f -- "$cfg_home/ghostty/quartz-settings"; fi
+	if have gsettings; then
+		grep -qE '"appText"[[:space:]]*:[[:space:]]*1(\.0*)?[,}[:space:]]' "$state_dir/config.json" 2>/dev/null || { grep -q '"appText"' "$state_dir/config.json" 2>/dev/null && run gsettings reset org.gnome.desktop.interface text-scaling-factor; }
+		if gsettings get org.gnome.desktop.interface cursor-theme 2>/dev/null | grep -qF "$cursor_theme"; then
+			run gsettings reset org.gnome.desktop.interface cursor-theme
+			run gsettings reset org.gnome.desktop.interface cursor-size
+		fi
+	fi
 	for f in "$state_dir" "$cache_dir"; do
 		if [ -e "$f" ]; then run rm -rf -- "$f" && [ $dry -eq 0 ] && ok "Removed $(pretty "$f")"; fi
 	done

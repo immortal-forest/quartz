@@ -5,6 +5,8 @@
 # colours from the wallpaper (quartz runs matugen); optional, so there's no
 # error before the first wallpaper
 config-file = ?themes/quartz
+# text size from Settings › Display & input (comes last, so it wins)
+config-file = ?quartz-settings
 font-size = 13
 cursor-style = block
 background-opacity = 0.92

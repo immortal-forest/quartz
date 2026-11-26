@@ -38,6 +38,8 @@ Singleton {
         o.popupTime = "normal"; o.autoWallpaper = 0; o.accent = ""; o.roundness = 1; o.motion = 2;
         o.clockSeconds = false; o.weekStart = "locale"; o.lockMedia = true;
         o.nightLight = false; o.nightTemp = 4500; o.audioFollow = true;
+        o.monitorScales = ({}); o.appText = 1.0; o.termFont = 13; o.cursorSize = 24; o.kbLayout = "";
+        o.naturalScroll = true; o.tapToClick = true; o.pointerSpeed = 0;
     }
 
     function bumpLaunch(id) {
@@ -104,6 +106,15 @@ Singleton {
             property int nightTemp: 4500          // kelvin
             // sound
             property bool audioFollow: true       // Bluetooth outputs take over the sound when they connect
+            // display & input (services/Desktop.qml writes them where Hyprland and the apps read them)
+            property var monitorScales: ({})      // { "eDP-1": 1.5 }; a screen that isn't here scales automatically
+            property real appText: 1.0            // GTK apps' text-scaling-factor
+            property int termFont: 13             // Ghostty's font-size (quartz's Ghostty config)
+            property int cursorSize: 24
+            property string kbLayout: ""          // "" = the config's own (us); "us,ru" = two, Alt + Shift switches
+            property bool naturalScroll: true     // touchpad
+            property bool tapToClick: true        // touchpad
+            property real pointerSpeed: 0         // -1 … 1
         }
     }
 }

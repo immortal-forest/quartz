@@ -33,7 +33,7 @@ A calm, complete desktop shell for [Hyprland](https://hyprland.org), built with 
 - **Clipboard history**: text and images, searchable.
 - **Wallpapers**: a picker with folders and search; the whole desktop takes the new wallpaper's colours.
 - **App colours**: Ghostty, window borders, GTK and Qt apps, Firefox / Zen (pywalfox), Chrome, btop and fzf follow the wallpaper too (matugen, [`config/matugen`](config/matugen)).
-- **Settings**: light or dark, accent colour, corners, motion, text size, bar items, night light and power mode.
+- **Settings**: light or dark, accent colour, corners, motion, text size, bar items, night light and power mode; screen scale per monitor, text size in apps and the terminal, cursor size, keyboard layout and the touchpad.
 - **Shortcuts**: Super + / lists every key, searchable, with links to the matching settings.
 - **Lock screen, power menu and on-screen volume and brightness.**
 - **Light**: nothing runs at rest, and a panel only exists while it's open.

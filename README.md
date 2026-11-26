@@ -47,7 +47,7 @@ git clone https://github.com/immortal-forest/quartz ~/quartz
 cd ~/quartz && ./install.sh
 ```
 
-Then log in and start Hyprland (`Hyprland` from the console). quartz starts with it.
+Then log in on the console and run `start-hyprland`. quartz starts with it.
 
 The installer explains each step and asks before it changes anything:
 

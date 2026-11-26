@@ -39,35 +39,48 @@ A calm, complete desktop shell for [Hyprland](https://hyprland.org), built with 
 
 ## Install
 
+On Arch (a fresh install is fine), as your normal user:
+
 ```sh
+sudo pacman -Syu --needed git
 git clone https://github.com/immortal-forest/quartz ~/quartz
 cd ~/quartz && ./install.sh
 ```
 
+Then log in and start Hyprland (`Hyprland` from the console). quartz starts with it.
+
 The installer explains each step and asks before it changes anything:
 
-1. Checks the programs and fonts quartz needs.
-2. Looks at your processor and graphics and suggests what suits them: microcode, video decoding, NVIDIA settings, and on a hybrid laptop the built-in GPU for the desktop.
-3. On Arch, installs only what's missing (pacman, and yay or paru for AUR packages), showing each command first. Other distros get the list.
-4. Downloads the Outfit font if it's missing, and installs quartz's cursor
-   (Bibata Modern Ice) unless your config already picks one.
-5. Links the shell to `~/.config/quickshell/quartz`. Anything already there is moved aside.
-6. Adds quartz to your Hyprland config in one marked block, backed up first. A fresh config gets quartz's full keymap; an existing one keeps your keys.
-7. Asks for your wallpaper folder.
-8. Reloads Hyprland and starts quartz.
+1. Checks everything the rice uses and nothing else: Hyprland, Quickshell, sound
+   (PipeWire), Bluetooth, Wi-Fi, screenshots, the terminal and shell tools. All
+   of it comes from the Arch repos.
+2. Looks at your graphics (on a hybrid laptop: the built-in GPU draws the desktop)
+   and your sound chip (adds its firmware when the speakers need it).
+3. Installs what's missing, showing each command first; starts sound, Bluetooth
+   and NetworkManager.
+4. Fonts (Outfit, Material Symbols) and quartz's cursor (Bibata Modern Ice).
+5. Links the shell to `~/.config/quickshell/quartz`.
+6. Terminal and shell: Ghostty, zsh with plugins, a starship prompt, and
+   quartz's scripts in `~/.local/bin`.
+7. Hyprland: a fresh setup gets quartz's clean config, whose keys are exactly
+   the ones Super + / shows. An existing config is kept and quartz adds one
+   marked block at the end.
+8. Your wallpaper folder, with 12 wallpapers to start with.
+9. Reloads Hyprland and starts quartz.
 
-It's safe to run again: it only does what isn't done yet.
+Where you already have a config (Hyprland, `.zshrc`, Ghostty, starship) it asks
+before replacing it, and keeps yours by default. Anything it replaces is moved
+aside, not deleted. It's safe to run again: it only does what isn't done yet.
 
 | Option | |
 |---|---|
 | `--dry-run` | show every step and command, change nothing |
 | `--yes` | take the default answer to every question |
-| `--uninstall` | remove the link and the Hyprland block; packages, fonts and settings stay |
+| `--uninstall` | undo all of it: quartz's configs, links, fonts, cursor, wallpapers, settings and caches go, your configs come back, and it offers to remove the packages it installed |
+| `--reinstall` | `--uninstall` (keeping the packages), then install again |
 | `--help` | the short version |
 
-### Requirements
-
-Arch packages; the installer finds them for you.
+### What it uses
 
 | For | Package |
 |---|---|
@@ -75,10 +88,14 @@ Arch packages; the installer finds them for you.
 | Colours from the wallpaper | `matugen` |
 | Wallpapers | `awww`, `ffmpeg` |
 | Clipboard | `wl-clipboard`, `cliphist` |
-| Brightness, audio | `brightnessctl`, `wireplumber` |
+| Sound | `pipewire-pulse`, `wireplumber` (and `sof-firmware` on chips that need it) |
+| Brightness, night light, power mode | `brightnessctl`, `hyprsunset`, `power-profiles-daemon` |
 | Wi-Fi, Bluetooth, battery | `networkmanager`, `bluez`, `upower` |
+| Screenshots, opening files | `hyprshot`, `xdg-utils` |
+| Terminal and shell | `ghostty`, `zsh`, `starship`, `git`, `fzf`, `zoxide`, `eza` |
 | Fonts | `ttf-material-symbols-variable`, [Outfit](https://fonts.google.com/specimen/Outfit) |
-| Nice to have | `hyprshot`, `hyprsunset` (night light), `power-profiles-daemon` (power mode) |
+
+Its configs are in [`config/`](config), the wallpapers in [`wallpapers/`](wallpapers).
 
 ### Without the installer
 

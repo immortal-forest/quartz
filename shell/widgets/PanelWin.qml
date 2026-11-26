@@ -84,15 +84,16 @@ PanelWindow {
             done.restart();
         }
     }
-    // open: unfold out of the bar with a small spring overshoot
-    SpringAnimation {
+    // open: unfold out of the bar on M3's emphasized-decelerate curve: fast out
+    // of the bar, a long soft landing, no wobble
+    NumberAnimation {
         id: unfold
         target: win
         property: "reveal"
         to: 1
-        spring: Anim.full ? 3.2 : Anim.k > 0 ? 12 : 60
-        damping: Anim.full ? 0.34 : 1
-        epsilon: 0.001
+        duration: Anim.slow
+        easing.type: Easing.BezierSpline
+        easing.bezierCurve: Anim.decel
     }
     // close: fold back up into the bar, quick and clean
     NumberAnimation {

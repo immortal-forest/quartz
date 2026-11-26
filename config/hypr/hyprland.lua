@@ -59,24 +59,24 @@ hl.config({
 -- Three fingers left / right on the touchpad: switch workspace
 hl.gesture({ fingers = 3, direction = "horizontal", action = "workspace" })
 
--- Motion: Hyprland's own springy defaults
-hl.curve("easeOutQuint", { type = "bezier", points = { { 0.23, 1 }, { 0.32, 1 } } })
-hl.curve("linear", { type = "bezier", points = { { 0, 0 }, { 1, 1 } } })
-hl.curve("almostLinear", { type = "bezier", points = { { 0.5, 0.5 }, { 0.75, 1 } } })
-hl.curve("quick", { type = "bezier", points = { { 0.15, 0 }, { 0.1, 1 } } })
-hl.curve("easy", { type = "spring", mass = 1, stiffness = 238.1191, damping = 24.21279333 })
-hl.animation({ leaf = "global", enabled = true, speed = 10, bezier = "default" })
-hl.animation({ leaf = "border", enabled = true, speed = 5.39, bezier = "easeOutQuint" })
-hl.animation({ leaf = "windows", enabled = true, speed = 4.79, spring = "easy" })
-hl.animation({ leaf = "windowsIn", enabled = true, speed = 4.1, spring = "easy", style = "popin 87%" })
-hl.animation({ leaf = "windowsOut", enabled = true, speed = 1.49, bezier = "linear", style = "popin 87%" })
-hl.animation({ leaf = "fadeIn", enabled = true, speed = 1.73, bezier = "almostLinear" })
-hl.animation({ leaf = "fadeOut", enabled = true, speed = 1.46, bezier = "almostLinear" })
-hl.animation({ leaf = "fade", enabled = true, speed = 3.03, bezier = "quick" })
-hl.animation({ leaf = "layers", enabled = true, speed = 3.81, bezier = "easeOutQuint" })
-hl.animation({ leaf = "layersIn", enabled = true, speed = 4, bezier = "easeOutQuint", style = "fade" })
-hl.animation({ leaf = "layersOut", enabled = true, speed = 1.5, bezier = "linear", style = "fade" })
-hl.animation({ leaf = "workspaces", enabled = true, speed = 1.94, bezier = "almostLinear", style = "fade" })
+-- Motion: one family of curves (Material 3) so everything moves alike. Things
+-- arrive fast and land softly (decel), leave quickly (accel); no overshoot.
+-- speed is in tenths of a second.
+hl.curve("decel", { type = "bezier", points = { { 0.05, 0.7 }, { 0.1, 1 } } })
+hl.curve("accel", { type = "bezier", points = { { 0.3, 0 }, { 0.8, 0.15 } } })
+hl.curve("standard", { type = "bezier", points = { { 0.2, 0 }, { 0, 1 } } })
+hl.animation({ leaf = "global", enabled = true, speed = 4, bezier = "standard" })
+hl.animation({ leaf = "windowsIn", enabled = true, speed = 4, bezier = "decel", style = "popin 90%" })
+hl.animation({ leaf = "windowsOut", enabled = true, speed = 2.5, bezier = "accel", style = "popin 90%" })
+hl.animation({ leaf = "windowsMove", enabled = true, speed = 4, bezier = "decel", style = "slide" })
+hl.animation({ leaf = "border", enabled = true, speed = 4, bezier = "standard" })
+hl.animation({ leaf = "fadeIn", enabled = true, speed = 3, bezier = "decel" })
+hl.animation({ leaf = "fadeOut", enabled = true, speed = 2.5, bezier = "accel" })
+hl.animation({ leaf = "fadeSwitch", enabled = true, speed = 3, bezier = "standard" })
+hl.animation({ leaf = "layersIn", enabled = true, speed = 3, bezier = "decel", style = "fade" })
+hl.animation({ leaf = "layersOut", enabled = true, speed = 2, bezier = "accel", style = "fade" })
+hl.animation({ leaf = "workspaces", enabled = true, speed = 4.5, bezier = "decel", style = "slide" })
+hl.animation({ leaf = "specialWorkspace", enabled = true, speed = 4.5, bezier = "decel", style = "slidevert" })
 
 -- Windows
 hl.window_rule({ -- apps can't maximise themselves over the layout

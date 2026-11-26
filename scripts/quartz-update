@@ -4,7 +4,8 @@
 #   quartz-update          update now; a notification says what came in
 #   quartz-update --check  only say whether there's an update
 #
-# The quartz-update.timer (set up by install.sh) runs it once a day. It only
+# The quartz-update.timer (set up by install.sh) runs it every hour and soon
+# after you log in. It only
 # fast-forwards: with changes of your own in the quartz folder, or a history
 # that went its own way, it leaves everything alone and says so. The shell
 # reloads by itself when its files change; new configs need ./install.sh.

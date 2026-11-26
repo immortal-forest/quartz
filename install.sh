@@ -1090,7 +1090,8 @@ terminal() {
 	done
 	auto_update
 }
-# quartz-update once a day: a systemd user timer (catches up after the laptop was off)
+# quartz-update every hour and 2 minutes after you log in: a systemd user timer
+# (a git fetch: cheap; offline it just tries again next time)
 update_units() { # → service, then timer, separated by a line with ---
 	cat <<UNITS
 [Unit]
@@ -1101,11 +1102,12 @@ Type=oneshot
 ExecStart=$here/scripts/quartz-update
 ---
 [Unit]
-Description=quartz: look for an update once a day
+Description=quartz: look for an update every hour, and soon after you log in
 
 [Timer]
-OnCalendar=daily
-RandomizedDelaySec=30min
+OnStartupSec=2min
+OnCalendar=hourly
+RandomizedDelaySec=5min
 Persistent=true
 
 [Install]
@@ -1118,10 +1120,11 @@ auto_update() {
 	tim=$(update_units | sed '1,/^---$/d')
 	if [ "$(cat "$dir/quartz-update.service" 2>/dev/null)" = "$svc" ] && [ "$(cat "$dir/quartz-update.timer" 2>/dev/null)" = "$tim" ] &&
 		systemctl --user is-enabled --quiet quartz-update.timer 2>/dev/null; then
-		ok "quartz updates itself once a day (quartz-update.timer; by hand: quartz-update)."
+		ok "quartz updates itself every hour (quartz-update.timer; by hand: quartz-update)."
 		return
 	fi
-	act "quartz can update itself once a day: a git pull here, and a notification says what's new."
+	act "quartz can keep itself up to date: it looks every hour and soon after you log in (a git"
+	note "pull here), and a notification says what's new."
 	ask "Turn that on?" y || { note "Update by hand any time: quartz-update (or git pull in $(pretty "$here"))."; return; }
 	if [ $dry -eq 1 ]; then
 		act "would write $(pretty "$dir")/quartz-update.service and .timer, then run: systemctl --user enable --now quartz-update.timer"
@@ -1133,8 +1136,10 @@ auto_update() {
 	printf '%s\n' "$svc" >"$dir/quartz-update.service"
 	printf '%s\n' "$tim" >"$dir/quartz-update.timer"
 	sys_run systemctl --user daemon-reload
-	sys_run systemctl --user enable --now quartz-update.timer && { recorded utimer quartz-update.timer || rec utimer quartz-update.timer; } &&
-		ok "quartz updates itself once a day (quartz-update.timer)."
+	# restart: an already running timer keeps its old schedule otherwise
+	sys_run systemctl --user enable quartz-update.timer && sys_run systemctl --user restart quartz-update.timer &&
+		{ recorded utimer quartz-update.timer || rec utimer quartz-update.timer; } &&
+		ok "quartz updates itself every hour (quartz-update.timer)."
 }
 
 # ── 6. Hyprland ─────────────────────────────────────────────────────────────

@@ -201,8 +201,8 @@ qs -c quartz ipc call quartz volume 5                 # also: brightness 5, mic,
 
 ## Updating
 
-The installer can turn on a daily update (`quartz-update.timer`): it pulls
-quartz, the shell reloads by itself, and a notification says what's new. By hand:
+The installer can turn on automatic updates (`quartz-update.timer`, every hour
+and soon after you log in): it pulls quartz, the shell reloads by itself, and a notification says what's new. By hand:
 `quartz-update` (or `quartz-update --check`). When an update brings new configs:
 
 ```sh

@@ -78,7 +78,7 @@ Arch packages; the installer finds them for you.
 | Brightness, audio | `brightnessctl`, `wireplumber` |
 | Wi-Fi, Bluetooth, battery | `networkmanager`, `bluez`, `upower` |
 | Fonts | `ttf-material-symbols-variable`, [Outfit](https://fonts.google.com/specimen/Outfit) |
-| Nice to have | `hyprshot`, `playerctl`, `hyprsunset` (night light), `power-profiles-daemon` (power mode) |
+| Nice to have | `hyprshot`, `hyprsunset` (night light), `power-profiles-daemon` (power mode) |
 
 ### Without the installer
 
@@ -201,3 +201,8 @@ rebuild; `--force` rebuilds all of them.
 [cliphist](https://github.com/sentriz/cliphist) ·
 [hyprshot](https://github.com/Gustash/Hyprshot) ·
 [Bibata Cursor](https://github.com/ful1e5/Bibata_Cursor) (GPL-3.0, in [`cursors/`](cursors))
+
+## Licence
+
+quartz is free software under the [GNU GPL v3](LICENSE). The bundled cursor
+(Bibata Cursor) is GPL-3.0 too; see [`cursors/`](cursors).

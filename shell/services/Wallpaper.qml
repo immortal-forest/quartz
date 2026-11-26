@@ -226,7 +226,7 @@ Singleton {
     }
 
     // Startup: make sure awww-daemon runs and shows our wallpaper, and that a
-    // palette exists. First run adopts whatever awww (or astralis) already shows.
+    // palette exists. First run adopts whatever awww already shows.
     property bool booted: false
     function bootOnce() {
         if (Config.ready && !root.booted) {
@@ -244,9 +244,6 @@ Singleton {
         command: ["sh", "-c",
             "mkdir -p \"$HOME/.cache/quartz\"; " +
             "w=\"$1\"; [ -z \"$w\" ] && command -v awww >/dev/null && w=$(awww query 2>/dev/null | sed -n 's/.*image: //p' | head -n1); " +
-            // without awww, skwd's wallpaper is what's on screen: theme from that one
-            "if ! command -v awww >/dev/null; then c=$(cat \"$HOME/.cache/astralis/current-wallpaper\" 2>/dev/null); [ -f \"$c\" ] && w=\"$c\"; fi; " +
-            "[ -z \"$w\" ] && w=$(cat \"$HOME/.cache/astralis/current-wallpaper\" 2>/dev/null); " +
             "[ -n \"$w\" ] && [ -f \"$w\" ] || w=''; " +
             "if command -v awww >/dev/null; then echo AWWW; " +
             "pgrep -x awww-daemon >/dev/null || { setsid -f awww-daemon >/dev/null 2>&1; i=0; until awww query >/dev/null 2>&1 || [ $i -ge 30 ]; do sleep 0.1; i=$((i+1)); done; }; " +

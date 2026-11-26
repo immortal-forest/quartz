@@ -53,7 +53,6 @@ data_home=${XDG_DATA_HOME:-$HOME/.local/share}
 qs_link=$cfg_home/quickshell/quartz
 hypr_dir=$cfg_home/hypr
 state_dir=$HOME/.local/state/quartz # where shell/core/Config.qml keeps its settings
-rice=$HOME/.local/bin/rice
 cursor_theme=Bibata-Modern-Ice # quartz's cursor, shipped in cursors/
 cursor_tar=$here/cursors/$cursor_theme.tar.gz
 root=${QUARTZ_TEST_ROOT:-}
@@ -414,7 +413,10 @@ choose_keymap() {
 	act "quartz also has a full keymap for windows, workspaces, apps and screenshots,"
 	note "the one its cheatsheet (Super + /) shows. Using it replaces your own binds"
 	note "on the same keys (yours stay in your config, quartz's block just comes last)."
-	if ask "Use quartz's full keymap?" n; then
+	local had=n
+	[ "$(block_state "$hypr_file")" = ok ] && block_text "$hypr_file" | grep -q 'essentials = true' && had=y
+	[ $had = y ] && note "Your quartz block uses it now."
+	if ask "Use quartz's full keymap?" $had; then
 		keymap=1
 		skip_keys=()
 	fi
@@ -432,7 +434,6 @@ qs_start() { # the command that starts quartz
 nv_va() { [ "${hw_nv_env:-0}" = 1 ] && { va_ok nvidia || in_list libva-nvidia-driver "${planned[@]}"; }; }
 make_block() {
 	local autostart=true clip=true k line
-	[ -x "$rice" ] && autostart=false
 	[ "$user_clip" = 1 ] && clip=false
 	if [ "$hypr_mode" = classic ]; then
 		echo "# >>> quartz >>>"
@@ -489,7 +490,7 @@ make_block() {
 	echo "	if ok then"
 	echo "		quartz.setup({"
 	echo "			mod = \"SUPER\","
-	echo "			autostart = $autostart,$([ $autostart = false ] && echo " -- rice starts your shell")"
+	echo "			autostart = $autostart,"
 	echo "			clipboard = $clip,$([ $clip = false ] && echo " -- your config already runs cliphist")"
 	[ "${hw_gpu:-0}" = 1 ] && echo "			gpu = \"integrated\", -- quartz runs on the integrated GPU (Mesa)"
 	[ "${hw_drm:-0}" = 1 ] && echo "			drm_devices = { \"$igpu_pci\", \"$nv_pci\" }, -- the first one renders the desktop"
@@ -606,7 +607,6 @@ EOF
 		if have "$c"; then ok "$c ${D}— $why${N}"; else note "· $p isn't installed (nice to have: $why)"; optional_pkgs+=("$p"); fi
 	done <<'EOF2'
 hyprshot|hyprshot|the screenshot button
-playerctl|playerctl|control music players from scripts
 hyprsunset|hyprsunset|Night light (Settings › Sound & display)
 powerprofilesctl|power-profiles-daemon|Power mode: Battery saver / Balanced / Performance
 EOF2
@@ -754,16 +754,12 @@ hardware() {
 			ask "Make Hyprland draw the desktop on the ${gpu_name[$ig]}?" y && hw_drm=1
 		fi
 		if [ "${gpu_driver[$nv]}" = nvidia ] && [ -e "$root$NVIDIA_EGL" ] && [ -e "$root$MESA_EGL" ]; then
-			if [ -x "$rice" ]; then
-				note "You start shells with $(pretty "$rice"), which sets their GPU environment itself."
-			else
-				note "quartz is drawn by the built-in chip, but NVIDIA's OpenGL libraries still load into it:"
-				note "about 125 MB of memory for nothing, and they can keep the NVIDIA card awake."
-				if ask "Run quartz on the ${gpu_name[$ig]} only?" y; then
-					hw_gpu=1
-					note "Apps you open from quartz's launcher start through Hyprland, so they aren't"
-					note "affected. To run one on the NVIDIA card: prime-run <app>"
-				fi
+			note "quartz is drawn by the built-in chip, but NVIDIA's OpenGL libraries still load into it:"
+			note "about 125 MB of memory for nothing, and they can keep the NVIDIA card awake."
+			if ask "Run quartz on the ${gpu_name[$ig]} only?" y; then
+				hw_gpu=1
+				note "Apps you open from quartz's launcher start through Hyprland, so they aren't"
+				note "affected. To run one on the NVIDIA card: prime-run <app>"
 			fi
 		fi
 		if [ "${gpu_driver[$nv]}" = nvidia ]; then
@@ -1095,11 +1091,6 @@ start() {
 		fi
 	fi
 	others_running
-	if [ -x "$rice" ]; then
-		ok "You switch shells with $(pretty "$rice"), so this installer doesn't start a second one."
-		note "Run  rice quartz  to switch to quartz."
-		return
-	fi
 	if quartz_running; then
 		ok "quartz is already running. (Restart it with Super + Shift + R.)"
 	elif ask "Start quartz now?" y; then
@@ -1187,9 +1178,7 @@ uninstall() {
 	if hypr_live && [ "${hypr_changed:-0}" = 1 ]; then
 		ask "Reload Hyprland now so quartz's keys go away?" y && run_q hyprctl reload
 	fi
-	if [ -x "$rice" ]; then
-		note "You switch shells with $(pretty "$rice"); switch away from quartz with it."
-	elif hypr_live && quartz_running; then
+	if hypr_live && quartz_running; then
 		ask "quartz is still running. Stop it now?" y && run_q qs kill -c quartz
 	fi
 	say ""

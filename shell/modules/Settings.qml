@@ -440,7 +440,7 @@ FloatingWindow {
                         subtitle: "Opens apps that run in a terminal. Leave empty to use your default"
                         Field {
                             implicitWidth: 200
-                            placeholder: Quickshell.env("TERMINAL") || "kitty"
+                            placeholder: Quickshell.env("TERMINAL") || "the first one installed"
                             text: Config.opt.terminal
                             input.onEditingFinished: Config.opt.terminal = text.trim()
                         }

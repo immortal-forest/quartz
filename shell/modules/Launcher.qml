@@ -62,8 +62,9 @@ OverlayWin {
             return;
         Config.bumpLaunch(e.id);
         let cmd = e.command.map(shq).join(" ");
+        // the terminal you set, else $TERMINAL, else the first one installed (like Super + T)
         if (e.runInTerminal)
-            cmd = (Config.opt.terminal || Quickshell.env("TERMINAL") || "kitty") + " -e " + cmd;
+            cmd = (Config.opt.terminal || Quickshell.env("TERMINAL") || "$(command -v ghostty kitty foot alacritty wezterm konsole xterm | head -n 1)") + " -e " + cmd;
         if (e.workingDirectory)
             cmd = "cd " + shq(e.workingDirectory) + " && " + cmd;
         const full = "systemd-run --user --scope --slice=app.slice --collect -q -- sh -c " + shq(cmd);

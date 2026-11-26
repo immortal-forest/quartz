@@ -1088,6 +1088,53 @@ terminal() {
 		fi
 		run mkdir -p "$HOME/.local/bin" && run ln -s "$f" "$dest" && rec link "$dest" && [ $dry -eq 0 ] && ok "Script: $(pretty "$dest") → $(pretty "$f")"
 	done
+	auto_update
+}
+# quartz-update once a day: a systemd user timer (catches up after the laptop was off)
+update_units() { # → service, then timer, separated by a line with ---
+	cat <<UNITS
+[Unit]
+Description=quartz: update (git pull) and say what's new
+
+[Service]
+Type=oneshot
+ExecStart=$here/scripts/quartz-update
+---
+[Unit]
+Description=quartz: look for an update once a day
+
+[Timer]
+OnCalendar=daily
+RandomizedDelaySec=30min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+UNITS
+}
+auto_update() {
+	local dir=$cfg_home/systemd/user svc tim
+	svc=$(update_units | sed '/^---$/,$d')
+	tim=$(update_units | sed '1,/^---$/d')
+	if [ "$(cat "$dir/quartz-update.service" 2>/dev/null)" = "$svc" ] && [ "$(cat "$dir/quartz-update.timer" 2>/dev/null)" = "$tim" ] &&
+		systemctl --user is-enabled --quiet quartz-update.timer 2>/dev/null; then
+		ok "quartz updates itself once a day (quartz-update.timer; by hand: quartz-update)."
+		return
+	fi
+	act "quartz can update itself once a day: a git pull here, and a notification says what's new."
+	ask "Turn that on?" y || { note "Update by hand any time: quartz-update (or git pull in $(pretty "$here"))."; return; }
+	if [ $dry -eq 1 ]; then
+		act "would write $(pretty "$dir")/quartz-update.service and .timer, then run: systemctl --user enable --now quartz-update.timer"
+		return
+	fi
+	mkdir -p "$dir"
+	recorded file "$dir/quartz-update.service" || rec file "$dir/quartz-update.service"
+	recorded file "$dir/quartz-update.timer" || rec file "$dir/quartz-update.timer"
+	printf '%s\n' "$svc" >"$dir/quartz-update.service"
+	printf '%s\n' "$tim" >"$dir/quartz-update.timer"
+	sys_run systemctl --user daemon-reload
+	sys_run systemctl --user enable --now quartz-update.timer && { recorded utimer quartz-update.timer || rec utimer quartz-update.timer; } &&
+		ok "quartz updates itself once a day (quartz-update.timer)."
 }
 
 # ── 6. Hyprland ─────────────────────────────────────────────────────────────
@@ -1386,6 +1433,7 @@ uninstall() {
 						if [ -e "$a" ] || [ -L "$a" ]; then run rm -rf -- "$a"; fi
 						run mv -- "$b" "$a" && [ $dry -eq 0 ] && ok "Put yours back: $(pretty "$a")"
 					fi ;;
+				utimer) if systemctl --user is-enabled --quiet "$a" 2>/dev/null; then sys_run systemctl --user disable --now "$a" && [ $dry -eq 0 ] && ok "Turned off $a"; fi ;;
 				sysdir) if [ -d "$a" ]; then sys_run sudo rm -f -- "$a/quartz-theme.json" && sys_run sudo rmdir -p --ignore-fail-on-non-empty -- "$a" && [ $dry -eq 0 ] && ok "Removed $a"; fi ;;
 				shell) if ask "Switch your login shell back to $a?" y; then
 						if tty_ok && [ $yes -eq 0 ]; then sys_run chsh -s "$a" </dev/tty; else note "Run it yourself: chsh -s $a"; fi

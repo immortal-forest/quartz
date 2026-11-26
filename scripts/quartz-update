@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# quartz-update: bring quartz up to date (git pull), quietly.
+#
+#   quartz-update          update now; a notification says what came in
+#   quartz-update --check  only say whether there's an update
+#
+# The quartz-update.timer (set up by install.sh) runs it once a day. It only
+# fast-forwards: with changes of your own in the quartz folder, or a history
+# that went its own way, it leaves everything alone and says so. The shell
+# reloads by itself when its files change; new configs need ./install.sh.
+set -u
+
+repo=$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd -P)
+check=0
+case ${1:-} in
+	--check) check=1 ;;
+	"") ;;
+	-h | --help) sed -n '2,10s/^# \{0,1\}//p' "$0"; exit 0 ;;
+	*) echo "Unknown option: $1 (use --check)" >&2; exit 2 ;;
+esac
+
+say() { # title body → a notification when there's a desktop, else the terminal
+	if [ -t 1 ] || [ -n "${QUARTZ_UPDATE_PRINT:-}" ] || ! command -v notify-send >/dev/null; then printf '%s: %s\n' "$1" "$2"
+	else notify-send -a quartz -i system-software-update "$1" "$2"; fi
+}
+g() { git -C "$repo" "$@"; }
+
+g rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo "$repo isn't a git checkout of quartz" >&2; exit 1; }
+branch=$(g symbolic-ref --quiet --short HEAD) || { say "quartz" "Not updating: the quartz folder isn't on a branch."; exit 1; }
+upstream=$(g rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null) || { say "quartz" "Not updating: $branch has no upstream branch."; exit 1; }
+
+# offline or GitHub unreachable: try again next time, quietly
+GIT_TERMINAL_PROMPT=0 timeout 60 git -C "$repo" fetch --quiet 2>/dev/null || exit 0
+
+behind=$(g rev-list --count "HEAD..$upstream")
+ahead=$(g rev-list --count "$upstream..HEAD")
+[ "$behind" -eq 0 ] && { [ -t 1 ] && echo "quartz is up to date."; exit 0; }
+if [ $check -eq 1 ]; then
+	echo "quartz: $behind new change(s) on $upstream."
+	exit 0
+fi
+if [ "$ahead" -gt 0 ]; then
+	say "quartz" "Not updating: your quartz folder has $ahead commit(s) of its own. Update by hand: cd $repo && git pull"
+	exit 1
+fi
+if [ -n "$(g status --porcelain --untracked-files=no)" ]; then
+	say "quartz" "Not updating: files in $repo were changed by hand. Update by hand: cd $repo && git pull"
+	exit 1
+fi
+
+old=$(g rev-parse HEAD)
+g merge --ff-only --quiet "$upstream" || { say "quartz" "The update didn't go through; run: cd $repo && git pull"; exit 1; }
+news=$(g log --format='• %s' "$old..HEAD" | head -n 5)
+more=""
+[ "$behind" -gt 5 ] && more=$'\n'"…and $((behind - 5)) more"
+# hypr/quartz.lua is read from here: Hyprland picks it up on a reload
+if ! g diff --quiet "$old" HEAD -- hypr && [ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ] && command -v hyprctl >/dev/null; then
+	hyprctl reload >/dev/null 2>&1
+fi
+# configs, templates or the installer changed: they're copies, so install.sh brings them over
+if g diff --quiet "$old" HEAD -- config install.sh; then
+	say "quartz updated" "$news$more"
+else
+	say "quartz updated" "$news$more"$'\n'"New configs: run $repo/install.sh to take them."
+fi

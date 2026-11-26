@@ -1,0 +1,46 @@
+# quartz: Starship prompt (https://starship.rs/config/)
+#
+#   …/quartz on  main [!?] took 4s
+#   ❯
+#
+# Line 1 says where you are and what's going on; line 2 is where you type.
+# The language modules only show up inside a project of that language.
+"$schema" = "https://starship.rs/config-schema.json"
+
+add_newline = false
+format = """
+$username$hostname$directory$git_branch$git_state$git_status\
+$python$nodejs$rust$golang$cmd_duration$jobs$status
+$character"""
+
+[character]                 # green after success, red after an error
+success_symbol = "[❯](bold green)"
+error_symbol = "[❯](bold red)"
+vimcmd_symbol = "[❮](bold green)"
+
+[directory]                 # folder, shortened inside git repos
+truncation_length = 3
+truncation_symbol = "…/"
+read_only = " 󰌾"
+
+[git_branch]
+symbol = " "
+
+[cmd_duration]              # how long the last command took, if over 2 s
+min_time = 2_000
+
+[status]                    # the exit code of a failed command
+disabled = false
+symbol = ""
+
+[python]
+symbol = " "
+
+[nodejs]
+symbol = " "
+
+[rust]
+symbol = "󱘗 "
+
+[golang]
+symbol = " "

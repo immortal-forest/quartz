@@ -61,8 +61,18 @@ alias launch='hyprctl dispatch exec'
 setopt NO_BEEP
 
 # fzf (Ctrl+R history, Ctrl+T files), zoxide (cd learns your folders), starship
-# fzf's colours follow the wallpaper (quartz writes them with matugen)
-[[ -r ~/.config/fzf/quartz-colors.zsh ]] && source ~/.config/fzf/quartz-colors.zsh
+# fzf's colours follow the wallpaper (quartz writes them with matugen), also in
+# shells that are already open: re-read before each prompt when they changed
+_quartz_fzf=~/.config/fzf/quartz-colors.zsh
+_quartz_fzf_colors() {
+  [[ -r $_quartz_fzf ]] || return
+  local c="$(<$_quartz_fzf)"
+  [[ $c == "$_quartz_fzf_seen" ]] && return
+  _quartz_fzf_seen=$c
+  source $_quartz_fzf
+}
+autoload -Uz add-zsh-hook && add-zsh-hook precmd _quartz_fzf_colors
+_quartz_fzf_colors
 eval "$(fzf --zsh)"
 eval "$(zoxide init --cmd cd zsh)"
 eval "$(starship init zsh)"

@@ -49,7 +49,8 @@ The installer explains each step and asks before it changes anything:
 1. Checks the programs and fonts quartz needs.
 2. Looks at your processor and graphics and suggests what suits them: microcode, video decoding, NVIDIA settings, and on a hybrid laptop the built-in GPU for the desktop.
 3. On Arch, installs only what's missing (pacman, and yay or paru for AUR packages), showing each command first. Other distros get the list.
-4. Downloads the Outfit font if it's missing.
+4. Downloads the Outfit font if it's missing, and installs quartz's cursor
+   (Bibata Modern Ice) unless your config already picks one.
 5. Links the shell to `~/.config/quickshell/quartz`. Anything already there is moved aside.
 6. Adds quartz to your Hyprland config in one marked block, backed up first. A fresh config gets quartz's full keymap; an existing one keeps your keys.
 7. Asks for your wallpaper folder.
@@ -90,7 +91,9 @@ quartz.setup({ mod = "SUPER", autostart = true, clipboard = true })
 
 Add `essentials = true` for quartz's full keymap (windows, workspaces, apps,
 screenshots) and `take_over = true` to let it replace your own binds on the
-same keys. Every option is listed at the top of
+same keys. For quartz's cursor, unpack
+[`cursors/Bibata-Modern-Ice.tar.gz`](cursors) into `~/.local/share/icons` and
+add `cursor = "Bibata-Modern-Ice"`. Every option is listed at the top of
 [`hypr/quartz.lua`](hypr/quartz.lua).
 
 With a classic config (`hyprland.conf`):
@@ -182,6 +185,11 @@ qs -c quartz ipc call quartz volume 5                 # also: brightness 5, mic,
 cd ~/quartz && git pull && ./install.sh
 ```
 
+On Hyprland's `-git` packages from the AUR, `scripts/update-hyprland` rebuilds
+the ones you have, one at a time in the order the Hyprland wiki asks for, so a
+library bump can't leave the rest broken. `--check` shows what it would
+rebuild; `--force` rebuilds all of them.
+
 ## Credits
 
 [Quickshell](https://quickshell.org) ·
@@ -191,4 +199,5 @@ cd ~/quartz && git pull && ./install.sh
 [Outfit](https://fonts.google.com/specimen/Outfit) ·
 [awww](https://codeberg.org/LGFae/awww) ·
 [cliphist](https://github.com/sentriz/cliphist) ·
-[hyprshot](https://github.com/Gustash/Hyprshot)
+[hyprshot](https://github.com/Gustash/Hyprshot) ·
+[Bibata Cursor](https://github.com/ful1e5/Bibata_Cursor) (GPL-3.0, in [`cursors/`](cursors))

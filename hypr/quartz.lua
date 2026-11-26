@@ -27,6 +27,9 @@
 --   drm_devices  GPUs Hyprland uses, by PCI address, first = renders the desktop:
 --                { "0000:06:00.0", "0000:01:00.0" } → AQ_DRM_DEVICES. PCI addresses
 --                (lspci) stay put; /dev/dri/cardN numbers can change between boots.
+--   cursor       cursor theme for Hyprland, apps and GTK, e.g. "Bibata-Modern-Ice"
+--                (quartz's, in cursors/; install.sh unpacks it)  (default: leave the cursor alone)
+--   cursor_size  cursor size in pixels                    (default 24)
 --
 -- The shell keys reach quartz through its global shortcuts
 -- (hl.dsp.global("quartz:<name>")), so they work even before you click anything.
@@ -176,6 +179,24 @@ function M.volume_keys()
 	bind("XF86AudioRaiseVolume", hl.dsp.exec_cmd("wpctl set-volume -l 1.5 @DEFAULT_AUDIO_SINK@ 5%+"), desc("Volume up", { locked = true, repeating = true, dont_inhibit = true })) -- volume up
 end
 
+-- The cursor, everywhere: Hyprland (hyprcursor falls back to XCursor for an
+-- XCursor-only theme like Bibata), apps (XCURSOR_*) and GTK (gsettings).
+-- XCURSOR_PATH names ~/.local/share/icons first: native-Wayland Qt and Electron
+-- apps read cursors through libwayland-cursor, which may not look there, and
+-- fall back to a black cursor. setcursor runs on every config load, so a
+-- reload re-applies it.
+function M.cursor(theme, size)
+	local home = os.getenv("HOME")
+	size = tostring(size)
+	hl.env("XCURSOR_THEME", theme)
+	hl.env("XCURSOR_SIZE", size)
+	hl.env("HYPRCURSOR_THEME", theme)
+	hl.env("HYPRCURSOR_SIZE", size)
+	hl.env("XCURSOR_PATH", home .. "/.local/share/icons:" .. home .. "/.icons:/usr/share/icons:/usr/share/pixmaps")
+	hl.exec_cmd("hyprctl setcursor '" .. theme .. "' " .. size)
+	hl.exec_cmd("gsettings set org.gnome.desktop.interface cursor-theme '" .. theme .. "'; gsettings set org.gnome.desktop.interface cursor-size " .. size)
+end
+
 -- quartz's surfaces are solid (one colour for the bar and the panels hanging
 -- from it), so they need no blur; quartz animates them itself, so Hyprland
 -- doesn't. quartz-frost = the power menu's whole-screen frosted backdrop.
@@ -228,6 +249,8 @@ function M.setup(o)
 		end
 		if #cards > 0 then hl.env("AQ_DRM_DEVICES", table.concat(cards, ":")) end
 	end
+	local cursor = opt(o, "cursor", nil)
+	if cursor then M.cursor(cursor, opt(o, "cursor_size", 24)) end
 	if opt(o, "binds", true) then M.binds(mod, restart) end
 	if opt(o, "essentials", false) then M.essentials(mod) end
 	if opt(o, "media_keys", true) then M.media_keys() end

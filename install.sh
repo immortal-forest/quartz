@@ -30,8 +30,8 @@ run again.
   -n, --dry-run    show every step and command, change nothing
   -y, --yes        don't ask: take the default answer every time
       --uninstall  remove the quartz link and the block this installer added to
-                   your Hyprland config. Packages, fonts, settings and
-                   wallpapers stay.
+                   your Hyprland config. Packages, fonts, the cursor,
+                   settings and wallpapers stay.
   -h, --help       show this help
 EOF
 }
@@ -54,6 +54,8 @@ qs_link=$cfg_home/quickshell/quartz
 hypr_dir=$cfg_home/hypr
 state_dir=$HOME/.local/state/quartz # where shell/core/Config.qml keeps its settings
 rice=$HOME/.local/bin/rice
+cursor_theme=Bibata-Modern-Ice # quartz's cursor, shipped in cursors/
+cursor_tar=$here/cursors/$cursor_theme.tar.gz
 root=${QUARTZ_TEST_ROOT:-}
 stamp=$(date +%Y%m%d-%H%M%S)
 MESA_EGL=/usr/share/glvnd/egl_vendor.d/50_mesa.json
@@ -447,6 +449,15 @@ make_block() {
 			echo "# /dev/dri/cardN numbers can change between boots: run install.sh again if they do."
 			echo "env = AQ_DRM_DEVICES,$igpu_card:$nv_card"
 		fi
+		if [ "${use_cursor:-0}" = 1 ]; then
+			echo "# Cursor: quartz's $cursor_theme"
+			echo "env = XCURSOR_THEME,$cursor_theme"
+			echo "env = XCURSOR_SIZE,24"
+			echo "env = HYPRCURSOR_THEME,$cursor_theme"
+			echo "env = HYPRCURSOR_SIZE,24"
+			echo "exec-once = hyprctl setcursor $cursor_theme 24"
+			echo "exec-once = gsettings set org.gnome.desktop.interface cursor-theme $cursor_theme"
+		fi
 		[ $autostart = true ] && echo "exec-once = $(qs_start)"
 		if [ $clip = true ]; then
 			echo "exec-once = wl-paste --type text --watch cliphist store"
@@ -482,6 +493,7 @@ make_block() {
 	echo "			clipboard = $clip,$([ $clip = false ] && echo " -- your config already runs cliphist")"
 	[ "${hw_gpu:-0}" = 1 ] && echo "			gpu = \"integrated\", -- quartz runs on the integrated GPU (Mesa)"
 	[ "${hw_drm:-0}" = 1 ] && echo "			drm_devices = { \"$igpu_pci\", \"$nv_pci\" }, -- the first one renders the desktop"
+	[ "${use_cursor:-0}" = 1 ] && echo "			cursor = \"$cursor_theme\", -- quartz's cursor (white, rounded)"
 	if [ "$keymap" = 1 ]; then
 		echo "			essentials = true, -- windows, workspaces, apps, screenshots"
 		echo "			take_over = true, -- quartz's keys replace earlier binds on the same keys"
@@ -871,8 +883,27 @@ get_font() { # family file url licence
 	run_q fc-cache -f "$dir"
 	if font_ok "$fam"; then ok "$fam installed."; else bad "Saved $(pretty "$dir/$file"), but fontconfig doesn't list $fam yet; log out and back in."; fi
 }
+# quartz's cursor. Left alone when your Hyprland config already picks one.
+cursor_ok() { local d; for d in "$data_home/icons" "$HOME/.icons" /usr/share/icons; do [ -f "$d/$cursor_theme/cursor.theme" ] && return 0; done; return 1; }
+cursor() {
+	use_cursor=0
+	if user_sets XCURSOR_THEME || user_sets HYPRCURSOR_THEME; then
+		ok "Cursor: your Hyprland config already picks one, so quartz leaves it alone."
+		note "For quartz's ($cursor_theme), take out your XCURSOR_THEME / HYPRCURSOR_THEME lines and run this again."
+		return
+	fi
+	if cursor_ok; then
+		ok "Cursor: $cursor_theme"
+		use_cursor=1
+		return
+	fi
+	act "quartz comes with a cursor, $cursor_theme (white, rounded; GPL-3.0). It goes in $(pretty "$data_home/icons")."
+	ask "Install it and use it?" y || { note "Your cursor stays as it is."; return; }
+	run mkdir -p "$data_home/icons" && run tar -xzf "$cursor_tar" -C "$data_home/icons" && use_cursor=1
+	[ $dry -eq 0 ] && [ $use_cursor = 1 ] && ok "Installed $(pretty "$data_home/icons/$cursor_theme")"
+}
 fonts() {
-	step "Fonts"
+	step "Fonts and cursor"
 	local fam
 	for fam in "Material Symbols Rounded" "Outfit"; do
 		if font_ok "$fam"; then ok "$fam"; continue; fi
@@ -888,6 +919,7 @@ fonts() {
 				'https://raw.githubusercontent.com/google/material-design-icons/master/variablefont/MaterialSymbolsRounded%5BFILL%2CGRAD%2Copsz%2Cwght%5D.ttf' "Apache License 2.0"
 		fi
 	done
+	cursor
 }
 
 # ── 5. link ─────────────────────────────────────────────────────────────────
@@ -908,10 +940,11 @@ link() {
 
 # ── 6. Hyprland ─────────────────────────────────────────────────────────────
 gpu_hints() { # what to add yourself when this installer can't write the block
-	[ "${hw_gpu:-0}${hw_drm:-0}${hw_nv_env:-0}" = 000 ] && return
-	note "For the graphics settings you picked, add these to your own quartz.setup({ … }):"
+	[ "${hw_gpu:-0}${hw_drm:-0}${hw_nv_env:-0}${use_cursor:-0}" = 0000 ] && return
+	note "For the settings you picked, add these to your own quartz.setup({ … }):"
 	[ "${hw_gpu:-0}" = 1 ] && note "  gpu = \"integrated\","
 	[ "${hw_drm:-0}" = 1 ] && note "  drm_devices = { \"$igpu_pci\", \"$nv_pci\" },"
+	[ "${use_cursor:-0}" = 1 ] && note "  cursor = \"$cursor_theme\","
 	[ "${hw_nv_env:-0}" = 1 ] && note "and: hl.env(\"__GLX_VENDOR_LIBRARY_NAME\", \"nvidia\"), plus LIBVA_DRIVER_NAME / NVD_BACKEND = nvidia / direct"
 }
 hyprland() {

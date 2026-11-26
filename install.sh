@@ -1148,8 +1148,13 @@ wallpapers() {
 	fi
 	if [ -d "$wdir" ] && find -L "$wdir" -maxdepth 4 -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.gif' -o -iname '*.bmp' \) 2>/dev/null | grep -q .; then
 		ok "It has pictures in it."
-		return
+	else
+		copy_wallpapers "$wdir"
 	fi
+	first_wallpaper "$cfg" "$wdir"
+}
+copy_wallpapers() {
+	local wdir=$1 f
 	local -a ours=()
 	for f in "$here"/wallpapers/*; do [ -f "$f" ] && ours+=("$f"); done
 	if [ ${#ours[@]} -gt 0 ]; then
@@ -1160,6 +1165,25 @@ wallpapers() {
 	else
 		act "The folder is empty: put some pictures (jpg or png) in $(pretty "$wdir"), then pick one with Super + C."
 	fi
+}
+# first_wallpaper settings folder → no wallpaper chosen yet: start on quartz's calm default
+# (else the folder's first picture), so the desktop doesn't come up on Hyprland's own
+first_wallpaper() {
+	local cfg=$1 wdir=$2 w
+	[ -f "$cfg" ] || return 0
+	grep -qE '"wallpaper"[[:space:]]*:[[:space:]]*"[^"]' "$cfg" && return 0
+	w=$wdir/lake_mountain.jpg
+	[ -f "$w" ] || w=$(find -L "$wdir" -maxdepth 3 -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' \) 2>/dev/null | sort | head -n1)
+	[ -n "$w" ] || return 0
+	case $w in *[\"\\\|\&]*) note "Pick your first wallpaper with Super + C."; return 0 ;; esac
+	if grep -qE '"wallpaper"[[:space:]]*:' "$cfg"; then
+		run sed -i -E "s|\"wallpaper\"[[:space:]]*:[[:space:]]*\"\"|\"wallpaper\": \"$w\"|" "$cfg"
+	else
+		run sed -i "0,/{/s|{|{\n  \"wallpaper\": \"$w\",|" "$cfg"
+	fi
+	[ $dry -eq 0 ] && ok "Starting wallpaper: $(pretty "$w") (change it with Super + C)"
+	quartz_running && note "quartz is running: restart it (Super + Shift + R) to show it."
+	return 0
 }
 
 # ── 8. start ────────────────────────────────────────────────────────────────

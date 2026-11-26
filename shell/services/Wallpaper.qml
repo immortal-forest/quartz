@@ -245,13 +245,15 @@ Singleton {
             "mkdir -p \"$HOME/.cache/quartz\"; " +
             "w=\"$1\"; [ -z \"$w\" ] && command -v awww >/dev/null && w=$(awww query 2>/dev/null | sed -n 's/.*image: //p' | head -n1); " +
             "[ -n \"$w\" ] && [ -f \"$w\" ] || w=''; " +
+            // a fresh setup: nothing saved, nothing on screen. Start on the folder's first picture
+            "[ -z \"$w\" ] && w=$(find -L \"$2\" -maxdepth 3 -type f \\( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' \\) 2>/dev/null | sort | head -n1); " +
             "if command -v awww >/dev/null; then echo AWWW; " +
             "pgrep -x awww-daemon >/dev/null || { setsid -f awww-daemon >/dev/null 2>&1; i=0; until awww query >/dev/null 2>&1 || [ $i -ge 30 ]; do sleep 0.1; i=$((i+1)); done; }; " +
             "[ -n \"$w\" ] && { awww query 2>/dev/null | grep -qF \"$w\" || awww img \"$w\" --transition-type fade --transition-duration 0.8 >/dev/null 2>&1; }; " +
             "else echo NOAWWW; command -v setwall >/dev/null && echo SETWALL; fi; " +
             "[ -n \"$w\" ] && echo \"WALL $w\"; " +
             "[ -n \"$w\" ] && { ! [ -s \"$HOME/.cache/quartz/palette.json\" ] || [ \"$w\" != \"$1\" ]; } && echo RETHEME; true",
-            "_", Config.opt.wallpaper]
+            "_", Config.opt.wallpaper, Config.opt.wallpaperDir]
         stdout: SplitParser {
             onRead: line => {
                 if (line === "AWWW") {

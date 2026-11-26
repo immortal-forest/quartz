@@ -635,6 +635,7 @@ ffmpeg|ffmpeg|wallpaper thumbnails in the picker
 pipewire-pulse|pipewire-pulse|sound for your apps (PipeWire in PulseAudio's place)
 hyprshot|hyprshot|screenshots (Super + P, Print, the control centre's button)
 hyprsunset|hyprsunset|Night light (Settings › Sound & display)
+hypridle|hypridle|dims, locks, turns off the screen and sleeps when you're away
 xdg-open|xdg-utils|opening files, folders and links
 ghostty|ghostty|the terminal (Super + T)
 zsh|zsh|the shell in it
@@ -644,6 +645,17 @@ fzf|fzf|fuzzy history and file search in the shell
 zoxide|zoxide|cd that learns your folders
 eza|eza|ls with icons
 EOF
+	# no command of their own to look for: ask pacman
+	if [ $is_arch = 1 ]; then
+		while IFS='|' read -r p why; do
+			if pacman -Q "$p" >/dev/null 2>&1; then [ -z "$quiet" ] && ok "$p ${D}— $why${N}"
+			else miss "$p is missing ${D}— $why${N}"; want "$p"; fi
+		done <<'EOF3'
+hyprpolkitagent|password prompts when an app needs your permission
+xdg-desktop-portal-hyprland|screen sharing and screenshots from apps
+xdg-desktop-portal-gtk|file pickers in apps
+EOF3
+	fi
 	if have powerprofilesctl; then
 		[ -z "$quiet" ] && ok "powerprofilesctl ${D}— Power mode (Settings › Battery)${N}"
 	elif have tlp || have auto-cpufreq || have tuned-adm; then
@@ -811,7 +823,7 @@ hardware() {
 # ── 3. packages ─────────────────────────────────────────────────────────────
 planned=()
 # packages the rest of the system leans on: --uninstall asks separately before removing these
-sys_pkgs=" hyprland networkmanager bluez pipewire pipewire-pulse wireplumber upower glib2 systemd util-linux sof-firmware alsa-ucm-conf zsh git "
+sys_pkgs=" hyprland xdg-desktop-portal-hyprland xdg-desktop-portal-gtk hyprpolkitagent networkmanager bluez pipewire pipewire-pulse wireplumber upower glib2 systemd util-linux sof-firmware alsa-ucm-conf zsh git "
 rec_pkgs() { local p; for p in "$@"; do [ -n "$p" ] || continue; if [[ $sys_pkgs == *" $p "* ]]; then rec syspkg "$p"; else rec pkg "$p"; fi; done; }
 offer_pkgs() { # "what they are" default pkg… → install from the repos / AUR
 	local label=$1 def=$2 p
@@ -1116,6 +1128,8 @@ hyprland() {
 			hypr_mode=lua hypr_file=$hypr_lua fresh=1
 		fi
 	fi
+	# idle: dim, lock, screen off, sleep (the clean config starts hypridle with it)
+	place_config "$here/config/hypr/hypridle.conf" "$hypr_dir/hypridle.conf" "a hypridle config (dim 5 min, lock 10, screen off 15, sleep 30)" || true
 	scan_hypr
 	ok "Your Hyprland config: $(pretty "$hypr_file") ($([ "$hypr_mode" = lua ] && echo "Lua" || echo "classic") format)"
 	if [ -n "$elsewhere" ]; then
@@ -1394,6 +1408,7 @@ uninstall() {
 	if recorded file "$cfg_home/ghostty/config" && [ -e "$cfg_home/ghostty/quartz-settings" ]; then run rm -f -- "$cfg_home/ghostty/quartz-settings"; fi
 	if have gsettings; then
 		grep -qE '"appText"[[:space:]]*:[[:space:]]*1(\.0*)?[,}[:space:]]' "$state_dir/config.json" 2>/dev/null || { grep -q '"appText"' "$state_dir/config.json" 2>/dev/null && run gsettings reset org.gnome.desktop.interface text-scaling-factor; }
+		[ -f "$state_dir/config.json" ] && run gsettings reset org.gnome.desktop.interface color-scheme
 		if gsettings get org.gnome.desktop.interface cursor-theme 2>/dev/null | grep -qF "$cursor_theme"; then
 			run gsettings reset org.gnome.desktop.interface cursor-theme
 			run gsettings reset org.gnome.desktop.interface cursor-size

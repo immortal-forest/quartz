@@ -9,11 +9,36 @@
 -- hl.monitor({ output = "eDP-1", mode = "2560x1600@165", position = "0x0", scale = 1.25 })
 hl.monitor({ output = "", mode = "preferred", position = "auto", scale = "auto" })
 
--- Apps on Wayland: Qt, GTK and Electron (Chrome, VS Code, Discord …)
+-- The session: tells apps and portals they're on Hyprland, on Wayland
+hl.env("XDG_CURRENT_DESKTOP", "Hyprland")
+hl.env("XDG_SESSION_TYPE", "wayland")
+hl.env("XDG_SESSION_DESKTOP", "Hyprland")
+
+-- Apps on Wayland: Qt, GTK, Firefox and Electron (Chrome, VS Code, Discord …)
 hl.env("QT_QPA_PLATFORM", "wayland;xcb")
 hl.env("QT_WAYLAND_DISABLE_WINDOWDECORATION", "1")
+hl.env("QT_AUTO_SCREEN_SCALE_FACTOR", "1")
 hl.env("GDK_BACKEND", "wayland,x11,*")
+hl.env("MOZ_ENABLE_WAYLAND", "1")
 hl.env("ELECTRON_OZONE_PLATFORM_HINT", "auto")
+-- Qt apps take quartz's wallpaper colours through qt6ct, when it's installed
+do
+	local f = io.open("/usr/bin/qt6ct", "r")
+	if f then
+		f:close()
+		hl.env("QT_QPA_PLATFORMTHEME", "qt6ct")
+	end
+end
+
+-- Started with the session: the environment for portals and user services,
+-- password prompts (polkit), and hypridle (dim, lock, screen off, sleep when
+-- you're away: ~/.config/hypr/hypridle.conf)
+hl.on("hyprland.start", function()
+	hl.exec_cmd("dbus-update-activation-environment --systemd --all")
+	hl.exec_cmd("systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP HYPRLAND_INSTANCE_SIGNATURE")
+	hl.exec_cmd("systemctl --user start hyprpolkitagent")
+	hl.exec_cmd("hypridle")
+end)
 
 hl.config({
 	general = {
@@ -25,6 +50,7 @@ hl.config({
 			inactive_border = "rgba(80808044)",
 		},
 		resize_on_border = true,
+		allow_tearing = true, -- lets games that ask for it skip vsync (window rule: immediate = true)
 		layout = "dwindle",
 	},
 	decoration = {
@@ -36,21 +62,27 @@ hl.config({
 			size = 6,
 			passes = 3,
 			new_optimizations = true,
+			ignore_opacity = true,
 		},
 	},
 	animations = { enabled = true },
 	dwindle = { preserve_split = true },
+	xwayland = { force_zero_scaling = true }, -- X11 apps sharp (not blurry) on a scaled screen
 	input = {
 		kb_layout = "us", -- your layout, e.g. "de" or "us,ru" (kb_options = "grp:alt_shift_toggle")
 		numlock_by_default = true,
 		follow_mouse = 1,
+		scroll_factor = 0.5, -- calmer wheel and touchpad scrolling
+		emulate_discrete_scroll = 1,
 		touchpad = { natural_scroll = true },
 	},
 	misc = {
 		disable_hyprland_logo = true,
 		disable_splash_rendering = true,
 		force_default_wallpaper = 0,
+		vrr = 1, -- the screen refreshes only when something changes; if it flickers, use 2 (fullscreen only)
 		focus_on_activate = true, -- a clicked notification or link raises its app's window
+		initial_workspace_tracking = 0, -- a new window opens where you are now, not where you launched it
 		key_press_enables_dpms = true, -- any key or mouse move wakes a blanked screen
 		mouse_move_enables_dpms = true,
 	},
@@ -83,6 +115,17 @@ hl.window_rule({ -- apps can't maximise themselves over the layout
 	name = "suppress-maximize",
 	match = { class = ".*" },
 	suppress_event = "maximize",
+})
+hl.window_rule({ -- file pickers and settings dialogs float
+	name = "float-dialogs",
+	match = { class = "^(xdg-desktop-portal-gtk|qt5ct|qt6ct|org.pulseaudio.pavucontrol|nm-connection-editor|blueman-manager)$" },
+	float = true,
+})
+hl.window_rule({ name = "float-firefox-library", match = { class = "^(firefox|zen)$", title = "^Library$" }, float = true })
+hl.window_rule({ -- Spotify asks for focus whenever the tray restarts; keep the hint, not the jump
+	name = "spotify-no-activate-focus",
+	match = { class = "^spotify$" },
+	focus_on_activate = false,
 })
 hl.window_rule({ -- XWayland drag-and-drop helpers don't steal focus
 	name = "fix-xwayland-drags",

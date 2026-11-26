@@ -131,6 +131,7 @@ function M.essentials(mod)
 	local rep = { repeating = true }
 	-- windows
 	ebind(mod .. " + Q",         hl.dsp.window.close(),                  desc("Close the window"))         -- close the window
+	ebind("ALT + F4",            hl.dsp.window.close(),                  desc("Close the window"))         -- close the window, the old way
 	ebind(mod .. " + W",         hl.dsp.window.float({ action = "toggle" }), desc("Float / tile"))          -- float / tile
 	ebind("ALT + Return",        hl.dsp.window.fullscreen(),             desc("Fullscreen"))                -- fullscreen
 	ebind(mod .. " + G",         hl.dsp.group.toggle(),                  desc("Group / ungroup"))           -- group / ungroup
@@ -227,7 +228,9 @@ end
 function M.colors()
 	local ok, c = pcall(dofile, (os.getenv("XDG_CONFIG_HOME") or (os.getenv("HOME") .. "/.config")) .. "/hypr/quartz-colors.lua")
 	if ok and type(c) == "table" and c.active then
-		hl.config({ general = { col = { active_border = c.active, inactive_border = c.inactive } } })
+		-- two colours = a gradient, which Lua config takes as a table (not a string)
+		local function col(v) return type(v) == "table" and { colors = v, angle = 45 } or v end
+		hl.config({ general = { col = { active_border = col(c.active), inactive_border = col(c.inactive) } } })
 	end
 end
 
@@ -292,6 +295,10 @@ function M.setup(o)
 	if opt(o, "volume_keys", true) then M.volume_keys() end
 	if opt(o, "rules", true) then M.rules() end
 	if opt(o, "colors", true) then M.colors() end
+	-- NVIDIA: hardware cursors flicker or vanish on its outputs
+	if opt(o, "nvidia_cursor_fix", true) and exists("/proc/driver/nvidia/version") then
+		hl.config({ cursor = { no_hardware_cursors = true } })
+	end
 	if opt(o, "autostart", false) then
 		hl.on("hyprland.start", function() hl.exec_cmd(qs) end)
 	end

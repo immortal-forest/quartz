@@ -92,6 +92,8 @@ aside, not deleted. It's safe to run again: it only does what isn't done yet.
 | Sound | `pipewire-pulse`, `wireplumber` (and `sof-firmware` on chips that need it) |
 | Brightness, night light, power mode | `brightnessctl`, `hyprsunset`, `power-profiles-daemon` |
 | Wi-Fi, Bluetooth, battery | `networkmanager`, `bluez`, `upower` |
+| Idle (dim, lock, screen off, sleep) | `hypridle` |
+| Password prompts, screen sharing, file pickers | `hyprpolkitagent`, `xdg-desktop-portal-hyprland`, `xdg-desktop-portal-gtk` |
 | Screenshots, opening files | `hyprshot`, `xdg-utils` |
 | Terminal and shell | `ghostty`, `zsh`, `starship`, `git`, `fzf`, `zoxide`, `eza` |
 | Fonts | `ttf-material-symbols-variable`, [Outfit](https://fonts.google.com/specimen/Outfit) |

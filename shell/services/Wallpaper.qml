@@ -76,7 +76,15 @@ Singleton {
     readonly property bool light: Config.opt.light
     readonly property string mode: light ? "light" : "dark"
     readonly property string scheme: Config.opt.scheme || "content"
-    onModeChanged: if (root.booted && root.current.length) retheme(root.current, root.available && Config.opt.themeApps)
+    onModeChanged: {
+        if (root.booted && root.current.length)
+            retheme(root.current, root.available && Config.opt.themeApps);
+        root.gtkScheme();
+    }
+    // GTK / libadwaita apps (and Chrome, portals) follow quartz's light / dark
+    function gtkScheme() {
+        Quickshell.execDetached(["gsettings", "set", "org.gnome.desktop.interface", "color-scheme", root.light ? "prefer-light" : "prefer-dark"]);
+    }
     onSchemeChanged: if (root.booted && root.current.length) retheme(root.current, root.available && Config.opt.themeApps)
     readonly property string accent: Config.opt.accent || ""
     onAccentChanged: if (root.booted && root.current.length) retheme(root.current, root.available && Config.opt.themeApps)
@@ -233,6 +241,7 @@ Singleton {
     function bootOnce() {
         if (Config.ready && !root.booted) {
             root.booted = true;
+            root.gtkScheme();
             boot.running = true;
         }
     }

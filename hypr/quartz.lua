@@ -30,6 +30,8 @@
 --   cursor       cursor theme for Hyprland, apps and GTK, e.g. "Bibata-Modern-Ice"
 --                (quartz's, in cursors/; install.sh unpacks it)  (default: leave the cursor alone)
 --   cursor_size  cursor size in pixels                    (default 24)
+--   colors       window borders in the wallpaper's colours, from the file
+--                quartz's matugen config writes (~/.config/hypr/quartz-colors.lua)  (default true)
 --
 -- The shell keys reach quartz through its global shortcuts
 -- (hl.dsp.global("quartz:<name>")), so they work even before you click anything.
@@ -197,6 +199,15 @@ function M.cursor(theme, size)
 	hl.exec_cmd("gsettings set org.gnome.desktop.interface cursor-theme '" .. theme .. "'; gsettings set org.gnome.desktop.interface cursor-size " .. size)
 end
 
+-- Window borders in the wallpaper's colours: matugen writes them (quartz's
+-- config/matugen) whenever the wallpaper changes, then reloads Hyprland.
+function M.colors()
+	local ok, c = pcall(dofile, (os.getenv("XDG_CONFIG_HOME") or (os.getenv("HOME") .. "/.config")) .. "/hypr/quartz-colors.lua")
+	if ok and type(c) == "table" and c.active then
+		hl.config({ general = { col = { active_border = c.active, inactive_border = c.inactive } } })
+	end
+end
+
 -- quartz's surfaces are solid (one colour for the bar and the panels hanging
 -- from it), so they need no blur; quartz animates them itself, so Hyprland
 -- doesn't. quartz-frost = the power menu's whole-screen frosted backdrop.
@@ -256,6 +267,7 @@ function M.setup(o)
 	if opt(o, "media_keys", true) then M.media_keys() end
 	if opt(o, "volume_keys", true) then M.volume_keys() end
 	if opt(o, "rules", true) then M.rules() end
+	if opt(o, "colors", true) then M.colors() end
 	if opt(o, "autostart", false) then
 		hl.on("hyprland.start", function() hl.exec_cmd(qs) end)
 	end

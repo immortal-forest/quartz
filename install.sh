@@ -1006,14 +1006,52 @@ link() {
 	run mkdir -p "$cfg_home/quickshell" && run ln -s "$here/shell" "$qs_link" && rec link "$qs_link" && [ $dry -eq 0 ] && ok "Linked $(pretty "$qs_link") → $(pretty "$here/shell")"
 }
 
+# the files quartz's matugen config writes (output_path lines, ~ expanded)
+matugen_outputs() { sed -n 's/^output_path = "\(.*\)"$/\1/p' "$here/config/matugen/config.toml" | sed "s|^~|$HOME|"; }
+# Chrome / Chromium / Brave follow the wallpaper through a BrowserThemeColor policy,
+# copied by matugen's hook into a policy folder you own
+chrome_colours() {
+	local b d seen=" "
+	for b in google-chrome-stable google-chrome chromium brave; do
+		have "$b" || continue
+		case $b in google-chrome*) d=/etc/opt/chrome/policies/managed ;; chromium) d=/etc/chromium/policies/managed ;; brave) d=/etc/brave/policies/managed ;; esac
+		[[ $seen == *" $d "* ]] && continue
+		seen+="$d "
+		if [ -d "$d" ] && [ -w "$d" ]; then ok "$b follows the wallpaper's colours."; continue; fi
+		if [ -d "$d" ]; then note "$b already has policies in $d (not yours), so quartz leaves its colours alone."; continue; fi
+		act "$b can take the wallpaper's colours too (Chrome's BrowserThemeColor policy)."
+		note "It needs one sudo: a policy folder you own, $d. $b then says it's"
+		note "\"managed by your organization\", and programs running as you could set its policies."
+		ask "Set it up?" y || continue
+		sys_run sudo install -d -o "$(id -un)" -m 755 "$d" && rec sysdir "$d"
+		[ -s "$cache_dir/chrome-theme.json" ] && [ -w "$d" ] && run cp -f -- "$cache_dir/chrome-theme.json" "$d/quartz-theme.json"
+	done
+	return 0
+}
+
 # ── 6. terminal, shell, scripts ─────────────────────────────────────────────
 terminal() {
-	step "Terminal, shell and scripts"
+	step "Terminal, shell, app colours and scripts"
 	note "quartz's terminal: Ghostty with zsh (plugins, history search, fzf, zoxide) and a"
 	note "two-line starship prompt."
 	place_config "$here/config/ghostty/config" "$cfg_home/ghostty/config" "a Ghostty config"
 	place_config "$here/config/zsh/.zshrc" "${ZDOTDIR:-$HOME}/.zshrc" "a .zshrc"
 	place_config "$here/config/starship.toml" "$cfg_home/starship.toml" "a starship config"
+	# app colours: quartz runs matugen with this on every wallpaper change
+	local mg=$cfg_home/matugen/config.toml mg_first=0
+	[ -e "$mg" ] || mg_first=1
+	{ [ -e "$mg" ] && ! cmp -s "$here/config/matugen/config.toml" "$mg" && ! recorded file "$mg"; } && mg_first=1
+	if place_config "$here/config/matugen/config.toml" "$mg" "a matugen config (app colours)"; then
+		for f in "$here"/config/matugen/templates/*; do
+			place_config "$f" "$cfg_home/matugen/templates/$(basename "$f")" "matugen's $(basename "$f") template" >/dev/null
+		done
+		# matugen rewrites these on every wallpaper change: keep the ones you had (they come back with --uninstall)
+		if [ $mg_first = 1 ]; then
+			while IFS= read -r f; do { [ -e "$f" ] || [ -L "$f" ]; } && aside "$f"; done < <(matugen_outputs)
+		fi
+		ok "App colours: Ghostty, window borders, GTK and Qt apps, Firefox / Zen (pywalfox), btop and fzf follow the wallpaper."
+		chrome_colours
+	fi
 	local zsh_bin cur f dest
 	zsh_bin=$(command -v zsh)
 	cur=$(getent passwd "$(id -un)" 2>/dev/null | cut -d: -f7)
@@ -1130,7 +1168,7 @@ wallpapers() {
 		ask_path "Where do you keep (or want to keep) your wallpapers?" "$HOME/wallpapers"
 		wdir=$answer
 		[ -d "$wdir" ] || { run mkdir -p "$wdir" && rec dir "$wdir"; }
-		if [ -f "$cfg_home/matugen/config.toml" ]; then
+		if [ -f "$cfg_home/matugen/config.toml" ] && ! cmp -s "$here/config/matugen/config.toml" "$cfg_home/matugen/config.toml"; then
 			act "You already have a matugen config ($(pretty "$cfg_home/matugen/config.toml"))."
 			note "quartz can run it on every new wallpaper, so the apps it themes follow quartz's colours."
 			note "That rewrites whatever those templates write (terminal themes and the like)."
@@ -1314,6 +1352,12 @@ uninstall() {
 	if hypr_live && quartz_running; then
 		ask "quartz is running. Stop it now?" y && run_q qs kill -c quartz
 	fi
+	# what quartz's matugen config wrote on wallpaper changes (yours come back in the replay below)
+	if recorded file "$cfg_home/matugen/config.toml"; then
+		while IFS= read -r f; do
+			if [ -e "$f" ]; then run rm -f -- "$f" && [ $dry -eq 0 ] && tidy "$(dirname "$f")"; fi
+		done < <(matugen_outputs)
+	fi
 	if [ -f "$manifest" ]; then
 		mapfile -t lines <"$manifest"
 		# newest first, so a file is removed before the one it replaced comes back
@@ -1328,6 +1372,7 @@ uninstall() {
 						if [ -e "$a" ] || [ -L "$a" ]; then run rm -rf -- "$a"; fi
 						run mv -- "$b" "$a" && [ $dry -eq 0 ] && ok "Put yours back: $(pretty "$a")"
 					fi ;;
+				sysdir) if [ -d "$a" ]; then sys_run sudo rm -f -- "$a/quartz-theme.json" && sys_run sudo rmdir -p --ignore-fail-on-non-empty -- "$a" && [ $dry -eq 0 ] && ok "Removed $a"; fi ;;
 				shell) if ask "Switch your login shell back to $a?" y; then
 						if tty_ok && [ $yes -eq 0 ]; then sys_run chsh -s "$a" </dev/tty; else note "Run it yourself: chsh -s $a"; fi
 					fi ;;

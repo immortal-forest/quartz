@@ -118,7 +118,9 @@ Singleton {
         themer.running = false;
         themer.running = true;
         if (apps)
-            Quickshell.execDetached(["sh", "-c", "if [ -n \"$4\" ]; then matugen -m \"$2\" -t \"scheme-$3\" color hex \"$4\"; else matugen -m \"$2\" -t \"scheme-$3\" image \"$1\"; fi >/dev/null 2>&1", "_", path, root.mode, root.scheme, root.accent]);
+            // --prefer like the palette above: with several strong colours and no
+            // terminal to ask, matugen otherwise gives up and themes nothing
+            Quickshell.execDetached(["sh", "-c", "if [ -n \"$4\" ]; then matugen -m \"$2\" -t \"scheme-$3\" color hex \"$4\"; else matugen -m \"$2\" -t \"scheme-$3\" --prefer \"$5\" image \"$1\"; fi >/dev/null 2>&1 </dev/null", "_", path, root.mode, root.scheme, root.accent, root.light ? "lightness" : "darkness"]);
     }
 
     Process {

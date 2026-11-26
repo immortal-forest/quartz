@@ -478,7 +478,7 @@ FloatingWindow {
                     SettingRow {
                         icon: "format_paint"
                         title: "Theme apps from the wallpaper"
-                        subtitle: "Terminals, window borders and cava take the wallpaper's colours too"
+                        subtitle: "Ghostty, window borders and GTK apps take the wallpaper's colours too"
                         Switch { checked: Config.opt.themeApps; onToggled: Config.opt.themeApps = !Config.opt.themeApps }
                     }
                 }

@@ -1,6 +1,10 @@
 # quartz: Ghostty. Its built-in font (JetBrains Mono + Nerd Font symbols)
 # covers the prompt's icons, so no extra font is needed.
 # Every option: ghostty +show-config --default --docs
+
+# colours from the wallpaper (quartz runs matugen); optional, so there's no
+# error before the first wallpaper
+config-file = ?themes/quartz
 font-size = 13
 cursor-style = block
 background-opacity = 0.92

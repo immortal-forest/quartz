@@ -1,0 +1,58 @@
+# quartz: app colours. quartz runs `matugen image <wallpaper>` with this whenever
+# the wallpaper, light / dark or the accent colour changes, so the apps match the
+# shell. Off: Settings › Appearance › Theme apps from the wallpaper.
+
+[config]
+
+# Ghostty: open terminals reload their colours (SIGUSR2)
+[templates.ghostty]
+input_path = "~/.config/matugen/templates/quartz-ghostty"
+output_path = "~/.config/ghostty/themes/quartz"
+post_hook = "pkill -USR2 -x ghostty || true"
+
+# Hyprland window borders: quartz's hypr/quartz.lua reads the file on every load
+[templates.hyprland]
+input_path = "~/.config/matugen/templates/quartz-hyprland.lua"
+output_path = "~/.config/hypr/quartz-colors.lua"
+post_hook = "hyprctl reload >/dev/null 2>&1 || true"
+
+# GTK 3 / 4 and libadwaita apps: they pick it up when they next start
+[templates.gtk3]
+input_path = "~/.config/matugen/templates/quartz-gtk.css"
+output_path = "~/.config/gtk-3.0/gtk.css"
+
+[templates.gtk4]
+input_path = "~/.config/matugen/templates/quartz-gtk.css"
+output_path = "~/.config/gtk-4.0/gtk.css"
+
+# Qt apps: pick the "quartz" colour scheme in qt5ct / qt6ct
+[templates.qt5ct]
+input_path = "~/.config/matugen/templates/quartz-qtct.conf"
+output_path = "~/.config/qt5ct/colors/quartz.conf"
+
+[templates.qt6ct]
+input_path = "~/.config/matugen/templates/quartz-qtct.conf"
+output_path = "~/.config/qt6ct/colors/quartz.conf"
+
+# Firefox / Zen, through the pywalfox extension (if it's installed)
+[templates.pywalfox]
+input_path = "~/.config/matugen/templates/quartz-pywalfox.json"
+output_path = "~/.cache/wal/colors.json"
+post_hook = "command -v pywalfox >/dev/null && pywalfox update >/dev/null 2>&1 || true"
+
+# btop: pick the "quartz" theme in its options
+[templates.btop]
+input_path = "~/.config/matugen/templates/quartz-btop.theme"
+output_path = "~/.config/btop/themes/quartz.theme"
+
+# fzf (and fzf-tab's completion menus): quartz's .zshrc reads it
+[templates.fzf]
+input_path = "~/.config/matugen/templates/quartz-fzf.zsh"
+output_path = "~/.config/fzf/quartz-colors.zsh"
+
+# Chrome / Chromium / Brave: a BrowserThemeColor policy. install.sh sets up a
+# policy folder you own (asked, one sudo); Chrome picks a change up by itself.
+[templates.chrome]
+input_path = "~/.config/matugen/templates/quartz-chrome.json"
+output_path = "~/.cache/quartz/chrome-theme.json"
+post_hook = "for d in /etc/opt/chrome/policies/managed /etc/chromium/policies/managed /etc/brave/policies/managed; do [ -d \"$d\" ] && [ -w \"$d\" ] && cp -f ~/.cache/quartz/chrome-theme.json \"$d/quartz-theme.json\"; done; true"

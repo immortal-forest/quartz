@@ -3,7 +3,7 @@
 # update-hyprland — rebuild the ALREADY-INSTALLED Hyprland (-git) stack IN ORDER, with yay.
 #
 # Why: on Arch, -git packages count as "building yourself" (per the Hyprland wiki
-# FAQ: https://wiki.hyprland.org/FAQ/). Every hypr* app links against the hypr*
+# FAQ: https://wiki.hypr.land/FAQ/). Every hypr* app links against the hypr*
 # libraries, so if one lib bumps its .so version and you don't rebuild the rest,
 # you get `error while loading shared libraries: ... cannot open shared object
 # file` or random crashes. The fix is to rebuild the whole stack together, in
@@ -56,10 +56,11 @@ unset LD_LIBRARY_PATH LIBRARY_PATH CPATH C_INCLUDE_PATH CPLUS_INCLUDE_PATH \
 
 # ---------------------------------------------------------------------------
 # ORDERING TEMPLATE ONLY — a package here is built solely if it's installed.
-# CORE order is MANDATORY (wiki FAQ order, plus split-out packages placed by
-# their real deps: hyprland-qt-support -> needs hyprlang; hyprtoolkit -> needs
-# aquamarine + hyprgraphics; hyprland-guiutils -> needs hyprtoolkit and is
-# itself a dep of hyprland).
+# CORE order is MANDATORY: the wiki's "Manual build" order
+# (https://wiki.hypr.land/getting-started/installation/#manual-build, checked
+# 2026-11-26), plus the packages it doesn't list, placed by their AUR deps:
+# hyprland-qt-support needs hyprlang; hyprland-guiutils needs hyprtoolkit and
+# hyprland needs it.
 # ---------------------------------------------------------------------------
 CORE=(
   hyprland-protocols-git
@@ -249,7 +250,7 @@ build() {
   fi
 }
 
-echo -e "\n:: Rebuilding in wiki-FAQ order$( ((FORCE)) && echo ' (forced clean rebuild)' )..."
+echo -e "\n:: Rebuilding in the wiki's build order$( ((FORCE)) && echo ' (forced clean rebuild)' )..."
 for p in "${TO_BUILD[@]}"; do build "$p"; done
 
 echo -e "\n\033[1;32m✔ Done.\033[0m Restart your Hyprland session (or reboot) to load the new binaries."

@@ -20,18 +20,22 @@ quartz installer
 
   ./install.sh [--dry-run] [--yes]
   ./install.sh --uninstall [--dry-run] [--yes]
+  ./install.sh --reinstall [--dry-run] [--yes]
 
-It checks what quartz needs, looks at your graphics chips, offers to install
-what's missing, links quartz into Quickshell, adds quartz to your Hyprland
-config (between ">>> quartz >>>" marker lines, after a backup), sets up your
-wallpaper folder and starts quartz. It asks before every change and is safe to
+It checks what quartz needs and installs what's missing, sets up its clean
+Hyprland config (or adds quartz to yours), its terminal and shell (Ghostty,
+zsh, starship), sound and Bluetooth, the fonts, the cursor and some
+wallpapers, then starts quartz. Where you already have a config it asks before
+replacing it (default: keep yours). It asks before every change and is safe to
 run again.
 
   -n, --dry-run    show every step and command, change nothing
   -y, --yes        don't ask: take the default answer every time
-      --uninstall  remove the quartz link and the block this installer added to
-                   your Hyprland config. Packages, fonts, the cursor,
-                   settings and wallpapers stay.
+      --uninstall  undo everything this installer did: its configs, links,
+                   fonts, cursor, wallpapers, settings and caches go, the
+                   configs it replaced come back, and it offers to remove the
+                   packages it installed
+      --reinstall  --uninstall (keeping the packages), then install again
   -h, --help       show this help
 EOF
 }
@@ -42,6 +46,7 @@ for a in "$@"; do
 		-n | --dry-run) dry=1 ;;
 		-y | --yes) yes=1 ;;
 		--uninstall) mode=uninstall ;;
+		--reinstall) mode=reinstall ;;
 		-h | --help) usage; exit 0 ;;
 		*) printf 'Unknown option: %s\n\n' "$a" >&2; usage >&2; exit 2 ;;
 	esac
@@ -53,6 +58,10 @@ data_home=${XDG_DATA_HOME:-$HOME/.local/share}
 qs_link=$cfg_home/quickshell/quartz
 hypr_dir=$cfg_home/hypr
 state_dir=$HOME/.local/state/quartz # where shell/core/Config.qml keeps its settings
+cache_dir=$HOME/.cache/quartz        # palettes, thumbnails (Theme.qml)
+manifest=$state_dir/installed        # everything this installer added, for --uninstall
+hypr_clean=$here/config/hypr/hyprland.lua
+clean_mark='-- quartz: clean Hyprland config'
 cursor_theme=Bibata-Modern-Ice # quartz's cursor, shipped in cursors/
 cursor_tar=$here/cursors/$cursor_theme.tar.gz
 root=${QUARTZ_TEST_ROOT:-}
@@ -73,7 +82,7 @@ act()  { printf '  %s→%s %s\n' "$C" "$N" "$*"; }
 warn() { printf '  %s!%s %s\n' "$Y" "$N" "$*"; }
 note() { printf '    %s%s%s\n' "$D" "$*" "$N"; }
 say()  { printf '%s\n' "$*"; }
-step_n=0 step_total=8
+step_n=0 step_total=9
 step() { step_n=$((step_n + 1)); printf '\n%s[%d/%d] %s%s\n' "$B" "$step_n" "$step_total" "$*" "$N"; }
 pretty() { case $1 in "$HOME") printf '~' ;; "$HOME"/*) printf '~%s' "${1#"$HOME"}" ;; *) printf '%s' "$1" ;; esac; }
 # a command line as you would type it
@@ -175,7 +184,38 @@ sys_run() { # package managers, sudo, systemctl
 backup() { # file → a copy next to it
 	local b="$1.quartz-backup-$stamp"
 	if [ $dry -eq 1 ]; then act "would back up $(pretty "$1") to $(pretty "$b")"; return 0; fi
-	cp -pL -- "$1" "$b" && ok "Backed up $(pretty "$1") to $(pretty "$b")"
+	cp -pL -- "$1" "$b" && rec file "$b" && ok "Backed up $(pretty "$1") to $(pretty "$b")"
+}
+# rec kind path [path2] → note what this installer did, so --uninstall can undo it:
+#   file / link / dir (made here), backup <path> <moved-aside copy>, pkg / syspkg <name>, shell <old login shell>
+rec() {
+	[ $dry -eq 1 ] && return 0
+	mkdir -p "$state_dir" && (IFS=$'\t'; printf '%s\n' "$*") >>"$manifest"
+}
+recorded() { [ -f "$manifest" ] && grep -qxF -- "$(IFS=$'\t'; printf '%s' "$*")" "$manifest"; }
+# aside path → move a file of yours out of the way (it comes back with --uninstall)
+aside() {
+	local b="$1.quartz-backup-$stamp"
+	run mv -- "$1" "$b" && rec backup "$1" "$b" && [ $dry -eq 0 ] && ok "Moved yours aside: $(pretty "$b")"
+	return 0
+}
+# place_config src dest "what" → one of quartz's configs at dest. Where one is
+# there already, ask first (default: keep yours). Succeeds when quartz's is in place.
+place_config() {
+	local src=$1 dest=$2 what=$3
+	if [ -e "$dest" ] || [ -L "$dest" ]; then
+		if cmp -s -- "$src" "$dest"; then ok "$what: quartz's ($(pretty "$dest"))"; return 0; fi
+		if recorded file "$dest"; then
+			act "quartz's $what has changed since you installed it ($(pretty "$dest"))."
+			ask "Update it? (the old one is moved aside)" y || { ok "Kept the one you have."; return 0; }
+		else
+			act "You already have $what: $(pretty "$dest")"
+			ask "Replace it with quartz's? (yours is moved aside; --uninstall brings it back)" n || { ok "Kept yours."; return 1; }
+		fi
+		aside "$dest"
+	fi
+	run mkdir -p "$(dirname "$dest")" && run cp -- "$src" "$dest" && rec file "$dest" && [ $dry -eq 0 ] && ok "$what: $(pretty "$dest")"
+	return 0
 }
 
 # ── facts ───────────────────────────────────────────────────────────────────
@@ -209,10 +249,19 @@ start_re='^[[:space:]]*(--|#) >>> quartz >>>[[:space:]]*$'
 end_re='^[[:space:]]*(--|#) <<< quartz <<<[[:space:]]*$'
 hypr_lua=$hypr_dir/hyprland.lua
 hypr_conf=$hypr_dir/hyprland.conf
-if [ -f "$hypr_lua" ]; then hypr_mode=lua hypr_file=$hypr_lua
-elif [ -f "$hypr_conf" ]; then hypr_mode=classic hypr_file=$hypr_conf
-else hypr_mode=none hypr_file=$hypr_lua
-fi
+detect_hypr() {
+	if [ -f "$hypr_lua" ]; then hypr_mode=lua hypr_file=$hypr_lua
+	elif [ -f "$hypr_conf" ]; then hypr_mode=classic hypr_file=$hypr_conf
+	else hypr_mode=none hypr_file=$hypr_lua
+	fi
+}
+detect_hypr
+is_clean() { [ -f "$1" ] && head -n1 "$1" | grep -qF -- "$clean_mark"; }
+# the file without quartz's block and trailing blank lines
+outside_block() {
+	awk -v s="$start_re" -v e="$end_re" '$0 ~ s { skip = 1 } !skip { l[++n] = $0 } skip && $0 ~ e { skip = 0 }
+		END { while (n > 0 && l[n] == "") n--; for (i = 1; i <= n; i++) print l[i] }' "$1"
+}
 ext_of() { [ "$1" = lua ] && echo lua || echo conf; }
 
 # none | ok | broken
@@ -540,7 +589,6 @@ put_block() {
 }
 remove_block() { # file → take quartz's block (and the blank line before it) out
 	local file=$1 tmp real
-	backup "$file"
 	if [ $dry -eq 1 ]; then act "would remove quartz's block from $(pretty "$file")"; hypr_changed=1; return 0; fi
 	tmp=$(mktemp)
 	awk -v s="$start_re" -v e="$end_re" '
@@ -584,7 +632,26 @@ busctl|systemd|lock screen
 setpriv|util-linux|lock screen
 udevadm|systemd|brightness changes
 ffmpeg|ffmpeg|wallpaper thumbnails in the picker
+pipewire-pulse|pipewire-pulse|sound for your apps (PipeWire in PulseAudio's place)
+hyprshot|hyprshot|screenshots (Super + P, Print, the control centre's button)
+hyprsunset|hyprsunset|Night light (Settings › Sound & display)
+xdg-open|xdg-utils|opening files, folders and links
+ghostty|ghostty|the terminal (Super + T)
+zsh|zsh|the shell in it
+starship|starship|its prompt
+git|git|fetches the shell's plugins
+fzf|fzf|fuzzy history and file search in the shell
+zoxide|zoxide|cd that learns your folders
+eza|eza|ls with icons
 EOF
+	if have powerprofilesctl; then
+		[ -z "$quiet" ] && ok "powerprofilesctl ${D}— Power mode (Settings › Battery)${N}"
+	elif have tlp || have auto-cpufreq || have tuned-adm; then
+		[ -z "$quiet" ] && note "· Power mode is off: tlp / auto-cpufreq / tuned runs your power here, and power-profiles-daemon would fight it"
+	else
+		miss "powerprofilesctl is missing ${D}— Power mode (package: power-profiles-daemon)${N}"
+		want power-profiles-daemon
+	fi
 	if have awww; then
 		[ -z "$quiet" ] && ok "awww ${D}— draws the wallpaper${N}"
 	elif have setwall; then
@@ -602,14 +669,6 @@ EOF
 			[ "$c" = "Material Symbols Rounded" ] && want ttf-material-symbols-variable
 		fi
 	done
-	[ -n "$quiet" ] && return
-	while IFS='|' read -r c p why; do
-		if have "$c"; then ok "$c ${D}— $why${N}"; else note "· $p isn't installed (nice to have: $why)"; optional_pkgs+=("$p"); fi
-	done <<'EOF2'
-hyprshot|hyprshot|the screenshot button
-hyprsunset|hyprsunset|Night light (Settings › Sound & display)
-powerprofilesctl|power-profiles-daemon|Power mode: Battery saver / Balanced / Performance
-EOF2
 }
 
 # ── 2. hardware ─────────────────────────────────────────────────────────────
@@ -652,22 +711,31 @@ detect_gpus() {
 		gpu_name+=("$(gpu_label "${gpu_pci[-1]}" "${gpu_vendor[-1]}")")
 	done
 }
+# a sound device driven (or, unbound, meant to be driven) by Sound Open Firmware.
+# Only what's bound counts: the snd_sof modules load on many machines that don't use them.
+sof_chip() {
+	local d drv
+	for d in "$root"/sys/bus/pci/devices/*; do
+		case $(cat "$d/class" 2>/dev/null) in 0x0401* | 0x0403*) ;; *) continue ;; esac
+		drv=$(basename "$(readlink "$d/driver" 2>/dev/null)")
+		case $drv in
+			sof-audio-pci* | snd_sof*) return 0 ;;
+			"") modprobe -R "$(cat "$d/modalias" 2>/dev/null)" 2>/dev/null | grep -q sof && return 0 ;;
+		esac
+	done
+	return 1
+}
 hardware() {
 	step "Your hardware"
-	local cpu cpu_vendor family model ucode i ig=-1 nv=-1 main va pkg
-	cpu=$(cat "$root/proc/cpuinfo" 2>/dev/null)
-	cpu_vendor=$(sed -n 's/^vendor_id[[:space:]]*:[[:space:]]*//p' <<<"$cpu" | head -1)
-	family=$(sed -n 's/^cpu family[[:space:]]*:[[:space:]]*//p' <<<"$cpu" | head -1)
-	model=$(sed -n 's/^model[[:space:]]*:[[:space:]]*//p' <<<"$cpu" | head -1)
-	case $cpu_vendor in AuthenticAMD) cpu="AMD" ucode=amd-ucode ;; GenuineIntel) cpu="Intel" ucode=intel-ucode ;; *) cpu="" ucode="" ;; esac
-	if [ -n "$ucode" ]; then
-		if [ $is_arch = 0 ]; then
-			ok "$cpu processor ${D}(microcode updates come from your distro's $ucode / microcode package)${N}"
-		elif pacman -T "$ucode" >/dev/null 2>&1; then
-			ok "$cpu processor, microcode updates installed ($ucode)"
+	local i ig=-1 nv=-1
+	# laptop speakers and microphones on "Sound Open Firmware" chips stay silent without it
+	if sof_chip; then
+		local p
+		for p in sof-firmware alsa-ucm-conf; do [ $is_arch = 1 ] && ! pacman -Q "$p" >/dev/null 2>&1 && hw_want "$p"; done
+		if [ ${#hw_pkgs[@]} -gt 0 ]; then
+			act "Your sound chip needs its firmware for the speakers and microphone: ${hw_pkgs[*]}."
 		else
-			act "$cpu processor: install $ucode. It's the processor maker's bug and security fixes, loaded at every boot."
-			hw_want "$ucode"
+			ok "Sound chip firmware (sof-firmware)"
 		fi
 	fi
 
@@ -685,29 +753,6 @@ hardware() {
 	for i in "${!gpu_pci[@]}"; do
 		ok "Graphics: ${gpu_name[$i]} ${D}(driver: ${gpu_driver[$i]:-none}, ${gpu_pci[$i]})${N}"
 	done
-
-	# the chip that draws the desktop decodes the video too
-	main=$ig
-	[ $main -lt 0 ] && main=$nv
-	if [ $main -lt 0 ]; then main=0; for i in "${!gpu_pci[@]}"; do [ "${gpu_boot[$i]}" = 1 ] && main=$i; done; fi
-	case ${gpu_driver[$main]} in
-		amdgpu) va=radeonsi pkg=$(pick_pkg libva-mesa-driver mesa) ;;
-		radeon) va=r600 pkg=$(pick_pkg libva-mesa-driver mesa) ;;
-		i915 | xe)
-			# Intel before Broadwell (2014) needs the older driver
-			if [ "$cpu_vendor" = GenuineIntel ] && [ "${family:-0}" = 6 ] && [ "${model:-99}" -lt 61 ]; then va=i965 pkg=libva-intel-driver; else va=iHD pkg=intel-media-driver; fi ;;
-		nvidia) va=nvidia pkg=libva-nvidia-driver ;;
-		nouveau) va=nouveau pkg=$(pick_pkg libva-mesa-driver mesa) ;;
-		*) va="" pkg="" ;;
-	esac
-	if [ -n "$va" ]; then
-		if va_ok "$va"; then
-			ok "Video decoding runs on the ${gpu_name[$main]} (VA-API driver: $va)"
-		else
-			act "Install $pkg: videos then decode on the ${gpu_name[$main]} instead of the processor (smoother, cooler, longer battery)."
-			hw_want "$pkg"
-		fi
-	fi
 
 	if [ $nv -ge 0 ] && [ "${gpu_driver[$nv]}" = nvidia ]; then
 		local ms
@@ -742,8 +787,7 @@ hardware() {
 		say ""
 		act "This is a hybrid laptop: the ${gpu_name[$ig]} is built into the processor and sips power,"
 		note "the ${gpu_name[$nv]} is fast but power-hungry. Best: the built-in chip draws the"
-		note "desktop and quartz, and the NVIDIA card wakes up only for games and heavy apps,"
-		note "which you start with  prime-run <app>  (Steam: launch option  prime-run %command%)."
+		note "desktop and quartz, and the NVIDIA card wakes up only for the apps you ask it to."
 		if user_sets AQ_DRM_DEVICES; then
 			ok "Your Hyprland config already picks the desktop GPU (AQ_DRM_DEVICES)."
 		elif [ "$hypr_mode" = classic ] && [ "${gpu_boot[$ig]}" = 1 ]; then
@@ -758,14 +802,7 @@ hardware() {
 			note "about 125 MB of memory for nothing, and they can keep the NVIDIA card awake."
 			if ask "Run quartz on the ${gpu_name[$ig]} only?" y; then
 				hw_gpu=1
-				note "Apps you open from quartz's launcher start through Hyprland, so they aren't"
-				note "affected. To run one on the NVIDIA card: prime-run <app>"
-			fi
-		fi
-		if [ "${gpu_driver[$nv]}" = nvidia ]; then
-			if have prime-run; then ok "prime-run is installed"
-			elif [ $is_arch = 1 ]; then act "Install nvidia-prime: it gives you the prime-run command."; hw_want nvidia-prime
-			else note "prime-run (to start an app on the NVIDIA card) comes from your distro's nvidia-prime package."
+				note "Apps you open from quartz's launcher start through Hyprland, so they aren't affected."
 			fi
 		fi
 	fi
@@ -773,10 +810,13 @@ hardware() {
 
 # ── 3. packages ─────────────────────────────────────────────────────────────
 planned=()
+# packages the rest of the system leans on: --uninstall asks separately before removing these
+sys_pkgs=" hyprland networkmanager bluez pipewire pipewire-pulse wireplumber upower glib2 systemd util-linux sof-firmware alsa-ucm-conf zsh git "
+rec_pkgs() { local p; for p in "$@"; do [ -n "$p" ] || continue; if [[ $sys_pkgs == *" $p "* ]]; then rec syspkg "$p"; else rec pkg "$p"; fi; done; }
 offer_pkgs() { # "what they are" default pkg… → install from the repos / AUR
 	local label=$1 def=$2 p
 	shift 2
-	local -a repo=() aur=() nc=()
+	local -a repo=() aur=() nc=() was=()
 	[ $yes -eq 1 ] && nc=(--noconfirm)
 	for p in "$@"; do
 		if pacman -Si "$p" >/dev/null 2>&1 || pacman -Sp --print-format %n "$p" >/dev/null 2>&1; then repo+=("$p"); else aur+=("$p"); fi
@@ -785,7 +825,8 @@ offer_pkgs() { # "what they are" default pkg… → install from the repos / AUR
 		act "$label, from the Arch repos: ${repo[*]}"
 		note "$(shq sudo pacman -S --needed "${nc[@]}" "${repo[@]}")"
 		if ask "Install them now?" "$def"; then
-			if sys_run sudo pacman -S --needed "${nc[@]}" "${repo[@]}"; then planned+=("${repo[@]}")
+			mapfile -t was < <(pacman -T "${repo[@]}" 2>/dev/null)
+			if sys_run sudo pacman -S --needed "${nc[@]}" "${repo[@]}"; then planned+=("${repo[@]}"); rec_pkgs "${was[@]}"
 			else bad "pacman stopped. Often an update fixes it: sudo pacman -Syu, then run this installer again."; fi
 		fi
 	fi
@@ -794,7 +835,8 @@ offer_pkgs() { # "what they are" default pkg… → install from the repos / AUR
 		if [ -n "$aur_helper" ]; then
 			note "$(shq "$aur_helper" -S --needed "${nc[@]}" "${aur[@]}")"
 			if ask "Install them now with $aur_helper?" "$def"; then
-				if sys_run "$aur_helper" -S --needed "${nc[@]}" "${aur[@]}"; then planned+=("${aur[@]}")
+				mapfile -t was < <(pacman -T "${aur[@]}" 2>/dev/null)
+				if sys_run "$aur_helper" -S --needed "${nc[@]}" "${aur[@]}"; then planned+=("${aur[@]}"); rec_pkgs "${was[@]}"
 				else bad "$aur_helper stopped; see its messages above."; fi
 			fi
 		else
@@ -808,15 +850,22 @@ packages() {
 	if [ ${#missing_pkgs[@]} -eq 0 ] && [ ${#hw_pkgs[@]} -eq 0 ]; then
 		ok "Nothing to install."
 	elif [ $is_arch = 1 ]; then
+		if in_list pipewire-pulse "${missing_pkgs[@]}" && pacman -Q pulseaudio >/dev/null 2>&1; then
+			act "PulseAudio is installed. quartz's sound runs on PipeWire, which takes its place (your apps keep working)."
+			if ask "Replace PulseAudio with PipeWire?" y; then
+				local -a pa=(pulseaudio)
+				pacman -Q pulseaudio-bluetooth >/dev/null 2>&1 && pa+=(pulseaudio-bluetooth)
+				sys_run sudo pacman -Rdd --noconfirm "${pa[@]}" || bad "Couldn't remove PulseAudio, so pipewire-pulse can't go in next to it."
+			fi
+		fi
 		[ ${#missing_pkgs[@]} -gt 0 ] && offer_pkgs "quartz needs" y "${missing_pkgs[@]}"
-		[ ${#hw_pkgs[@]} -gt 0 ] && offer_pkgs "Suggested for your hardware" y "${hw_pkgs[@]}"
+		[ ${#hw_pkgs[@]} -gt 0 ] && offer_pkgs "For your sound chip" y "${hw_pkgs[@]}"
 	else
 		act "Install these with your distro's package manager (these are Arch's names; yours may differ):"
 		[ ${#missing_pkgs[@]} -gt 0 ] && note "quartz needs:      ${missing_pkgs[*]}"
 		[ ${#hw_pkgs[@]} -gt 0 ] && note "for your hardware: ${hw_pkgs[*]}"
 		note "quartz still runs without them; the parts that need them won't work."
 	fi
-	[ $is_arch = 1 ] && [ ${#optional_pkgs[@]} -gt 0 ] && offer_pkgs "Nice to have" n "${optional_pkgs[@]}"
 	if [ $dry -eq 0 ] && [ ${#planned[@]} -gt 0 ]; then
 		hash -r
 		say "  Checking again:"
@@ -827,9 +876,24 @@ packages() {
 }
 services() {
 	have systemctl || return 0
-	if have_bluez && ls "$root"/sys/class/bluetooth/hci* >/dev/null 2>&1 && ! systemctl is-active --quiet bluetooth; then
-		act "Bluetooth is installed, but its service isn't running, so quartz can't see your devices."
-		ask "Start it now and at every boot? (sudo systemctl enable --now bluetooth)" y && sys_run sudo systemctl enable --now bluetooth
+	local u
+	if have pipewire-pulse; then
+		for u in pipewire.socket pipewire-pulse.socket wireplumber.service; do
+			systemctl --user is-active --quiet "$u" && continue
+			act "Sound: $u isn't running, so there's no sound and quartz's volume can't work."
+			ask "Start it now and at every login? (systemctl --user enable --now $u)" y && sys_run systemctl --user enable --now "$u"
+		done
+	fi
+	if have_bluez; then
+		if ! systemctl is-active --quiet bluetooth; then
+			act "Bluetooth's service isn't running, so quartz can't see your devices."
+			ask "Start it now and at every boot? (sudo systemctl enable --now bluetooth)" y && sys_run sudo systemctl enable --now bluetooth
+		fi
+		if have rfkill && rfkill list bluetooth 2>/dev/null | grep -q 'Soft blocked: yes'; then
+			act "Bluetooth is switched off (rfkill)."
+			ask "Switch it on?" y && { sys_run rfkill unblock bluetooth || sys_run sudo rfkill unblock bluetooth; }
+		fi
+		ls "$root"/sys/class/bluetooth/hci* >/dev/null 2>&1 || note "No Bluetooth adapter showed up (/sys/class/bluetooth); quartz's Bluetooth page stays empty without one."
 	fi
 	if { have powerprofilesctl || in_list power-profiles-daemon "${planned[@]}"; } && ! systemctl is-active --quiet power-profiles-daemon; then
 		if systemctl is-active --quiet tlp || systemctl is-active --quiet auto-cpufreq || systemctl is-active --quiet tuned; then
@@ -842,9 +906,16 @@ services() {
 		fi
 	fi
 	if have nmcli && ! systemctl is-active --quiet NetworkManager; then
-		warn "NetworkManager isn't running, so quartz's Wi-Fi page can't work."
-		note "If NetworkManager is how you want to connect: sudo systemctl enable --now NetworkManager"
-		note "If you use something else (iwd, systemd-networkd), keep it; only the Wi-Fi page is affected."
+		local other=""
+		for u in systemd-networkd iwd dhcpcd connman netctl; do systemctl is-active --quiet "$u" && other+=" $u"; done
+		if [ -z "$other" ]; then
+			act "NetworkManager isn't running, so quartz's Wi-Fi page can't work."
+			ask "Start it now and at every boot? (sudo systemctl enable --now NetworkManager)" y && sys_run sudo systemctl enable --now NetworkManager
+		else
+			warn "NetworkManager isn't running; your network comes from${other}."
+			note "Two network managers fight, so I'm leaving it. quartz's Wi-Fi page needs NetworkManager:"
+			note "switch with  sudo systemctl disable --now${other} && sudo systemctl enable --now NetworkManager"
+		fi
 	fi
 }
 
@@ -875,7 +946,7 @@ get_font() { # family file url licence
 		rm -f "$tmp"
 		return
 	fi
-	mkdir -p "$dir" && mv "$tmp" "$dir/$file" && chmod 644 "$dir/$file"
+	mkdir -p "$dir" && mv "$tmp" "$dir/$file" && chmod 644 "$dir/$file" && rec file "$dir/$file"
 	run_q fc-cache -f "$dir"
 	if font_ok "$fam"; then ok "$fam installed."; else bad "Saved $(pretty "$dir/$file"), but fontconfig doesn't list $fam yet; log out and back in."; fi
 }
@@ -895,7 +966,7 @@ cursor() {
 	fi
 	act "quartz comes with a cursor, $cursor_theme (white, rounded; GPL-3.0). It goes in $(pretty "$data_home/icons")."
 	ask "Install it and use it?" y || { note "Your cursor stays as it is."; return; }
-	run mkdir -p "$data_home/icons" && run tar -xzf "$cursor_tar" -C "$data_home/icons" && use_cursor=1
+	run mkdir -p "$data_home/icons" && run tar -xzf "$cursor_tar" -C "$data_home/icons" && use_cursor=1 && rec file "$data_home/icons/$cursor_theme"
 	[ $dry -eq 0 ] && [ $use_cursor = 1 ] && ok "Installed $(pretty "$data_home/icons/$cursor_theme")"
 }
 fonts() {
@@ -930,8 +1001,43 @@ link() {
 	if [ -e "$qs_link" ] || [ -L "$qs_link" ]; then
 		act "Something is already at $(pretty "$qs_link"); it gets moved aside, not deleted."
 		run mv -- "$qs_link" "$qs_link.backup-$stamp" || { bad "Couldn't move it; leaving everything as it was."; return; }
+		rec backup "$qs_link" "$qs_link.backup-$stamp"
 	fi
-	run mkdir -p "$cfg_home/quickshell" && run ln -s "$here/shell" "$qs_link" && [ $dry -eq 0 ] && ok "Linked $(pretty "$qs_link") → $(pretty "$here/shell")"
+	run mkdir -p "$cfg_home/quickshell" && run ln -s "$here/shell" "$qs_link" && rec link "$qs_link" && [ $dry -eq 0 ] && ok "Linked $(pretty "$qs_link") → $(pretty "$here/shell")"
+}
+
+# ── 6. terminal, shell, scripts ─────────────────────────────────────────────
+terminal() {
+	step "Terminal, shell and scripts"
+	note "quartz's terminal: Ghostty with zsh (plugins, history search, fzf, zoxide) and a"
+	note "two-line starship prompt."
+	place_config "$here/config/ghostty/config" "$cfg_home/ghostty/config" "a Ghostty config"
+	place_config "$here/config/zsh/.zshrc" "${ZDOTDIR:-$HOME}/.zshrc" "a .zshrc"
+	place_config "$here/config/starship.toml" "$cfg_home/starship.toml" "a starship config"
+	local zsh_bin cur f dest
+	zsh_bin=$(command -v zsh)
+	cur=$(getent passwd "$(id -un)" 2>/dev/null | cut -d: -f7)
+	if [ -n "$zsh_bin" ] && [ -n "$cur" ] && [ "$(basename "$cur")" != zsh ]; then
+		act "Your login shell is $cur."
+		if ask "Make zsh your shell? (chsh asks for your password)" y; then
+			if tty_ok && [ $yes -eq 0 ]; then sys_run chsh -s "$zsh_bin" </dev/tty && rec shell "$cur"
+			else note "No terminal for the password; run it yourself: chsh -s $zsh_bin"; fi
+		fi
+	else
+		[ -n "$zsh_bin" ] && ok "Your login shell is zsh."
+	fi
+	# scripts: linked, so a git pull updates them
+	for f in "$here"/scripts/*; do
+		[ -f "$f" ] || continue
+		dest=$HOME/.local/bin/$(basename "$f")
+		if [ -L "$dest" ] && [ "$(readlink -f "$dest")" = "$(readlink -f "$f")" ]; then ok "Script: $(basename "$f") ($(pretty "$dest"))"; continue; fi
+		if [ -e "$dest" ] || [ -L "$dest" ]; then
+			act "You already have $(pretty "$dest")."
+			ask "Replace it with quartz's? (yours is moved aside)" n || continue
+			aside "$dest"
+		fi
+		run mkdir -p "$HOME/.local/bin" && run ln -s "$f" "$dest" && rec link "$dest" && [ $dry -eq 0 ] && ok "Script: $(pretty "$dest") → $(pretty "$f")"
+	done
 }
 
 # ── 6. Hyprland ─────────────────────────────────────────────────────────────
@@ -945,28 +1051,31 @@ gpu_hints() { # what to add yourself when this installer can't write the block
 }
 hyprland() {
 	step "Adding quartz to Hyprland"
-	local example blk rc l
+	local blk rc l f
 	if [ "$hypr_mode" = none ]; then
-		example=""
-		[ -f /usr/share/hypr/hyprland.conf ] && example=/usr/share/hypr/hyprland.conf hypr_mode=classic hypr_file=$hypr_conf
-		[ -f /usr/share/hypr/hyprland.lua ] && example=/usr/share/hypr/hyprland.lua hypr_mode=lua hypr_file=$hypr_lua
-		if [ -z "$example" ]; then
-			hypr_mode=lua hypr_file=$hypr_lua
-			bad "You don't have a Hyprland config yet ($(pretty "$hypr_dir") is empty)."
-			note "Start Hyprland once (it writes its default config), then run this installer again. Or add this yourself:"
-			say ""
-			make_block
-			return
-		fi
-		act "You don't have a Hyprland config yet. Hyprland ships an example: its default setup."
-		if ask "Copy it to $(pretty "$hypr_file") and add quartz to it?" y; then
-			run mkdir -p "$hypr_dir" && run cp "$example" "$hypr_file"
-			fresh=1
+		act "You don't have a Hyprland config yet, so quartz sets up its clean one: look, layout,"
+		note "input and quartz's own keys, nothing else bound."
+		run mkdir -p "$hypr_dir" && run cp "$hypr_clean" "$hypr_lua" && rec file "$hypr_lua"
+		hypr_mode=lua hypr_file=$hypr_lua fresh=1
+	elif is_clean "$hypr_file"; then
+		fresh=1
+		if [ "$(outside_block "$hypr_file")" = "$(outside_block "$hypr_clean")" ]; then
+			ok "Your Hyprland config is quartz's clean one."
 		else
-			note "Then add this to your Hyprland config yourself:"
-			say ""
-			make_block
-			return
+			act "Your Hyprland config is quartz's clean one, changed (by you, or quartz has a newer one)."
+			if ask "Replace it with quartz's current one? (yours is moved aside)" n; then
+				aside "$hypr_file"
+				run cp "$hypr_clean" "$hypr_lua" && rec file "$hypr_lua"
+			fi
+		fi
+	else
+		act "You have your own Hyprland config: $(pretty "$hypr_file")"
+		note "quartz can replace it with its clean one (yours is moved aside and comes back with"
+		note "--uninstall), or keep yours and add quartz's block at the end (your keys stay yours)."
+		if ask "Replace it with quartz's clean config?" n; then
+			for f in "$hypr_lua" "$hypr_conf"; do { [ -e "$f" ] || [ -L "$f" ]; } && aside "$f"; done
+			run cp "$hypr_clean" "$hypr_lua" && rec file "$hypr_lua"
+			hypr_mode=lua hypr_file=$hypr_lua fresh=1
 		fi
 	fi
 	scan_hypr
@@ -1020,7 +1129,7 @@ wallpapers() {
 	else
 		ask_path "Where do you keep (or want to keep) your wallpapers?" "$HOME/wallpapers"
 		wdir=$answer
-		[ -d "$wdir" ] || run mkdir -p "$wdir"
+		[ -d "$wdir" ] || { run mkdir -p "$wdir" && rec dir "$wdir"; }
 		if [ -f "$cfg_home/matugen/config.toml" ]; then
 			act "You already have a matugen config ($(pretty "$cfg_home/matugen/config.toml"))."
 			note "quartz can run it on every new wallpaper, so the apps it themes follow quartz's colours."
@@ -1034,18 +1143,20 @@ wallpapers() {
 			act "would create $(pretty "$cfg"):"
 			sed 's/^/      /' <<<"$json"
 		else
-			mkdir -p "$state_dir" && printf '%s\n' "$json" >"$cfg" && ok "Saved quartz's settings: $(pretty "$cfg")"
+			mkdir -p "$state_dir" && printf '%s\n' "$json" >"$cfg" && rec file "$cfg" && ok "Saved quartz's settings: $(pretty "$cfg")"
 		fi
 	fi
 	if [ -d "$wdir" ] && find -L "$wdir" -maxdepth 4 -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.gif' -o -iname '*.bmp' \) 2>/dev/null | grep -q .; then
 		ok "It has pictures in it."
 		return
 	fi
-	local -a samples=()
-	for f in /usr/share/hypr/wall*.png; do [ -f "$f" ] && samples+=("$f"); done
-	if [ ${#samples[@]} -gt 0 ]; then
-		act "The folder is empty. Hyprland comes with ${#samples[@]} sample wallpapers."
-		if ask "Copy them in so quartz has something to start with?" y; then run cp -n "${samples[@]}" "$wdir/"; fi
+	local -a ours=()
+	for f in "$here"/wallpapers/*; do [ -f "$f" ] && ours+=("$f"); done
+	if [ ${#ours[@]} -gt 0 ]; then
+		act "The folder is empty. quartz comes with ${#ours[@]} wallpapers."
+		if ask "Copy them in so quartz has something to start with?" y; then
+			for f in "${ours[@]}"; do run cp -n -- "$f" "$wdir/" && rec file "$wdir/$(basename "$f")"; done
+		fi
 	else
 		act "The folder is empty: put some pictures (jpg or png) in $(pretty "$wdir"), then pick one with Super + C."
 	fi
@@ -1136,7 +1247,7 @@ SUPER + slash|every quartz shortcut
 SUPER + comma|settings
 SUPER + C|pick a wallpaper
 EOF
-	say "  Undo what this installer added: $(pretty "$here")/install.sh --uninstall"
+	say "  Undo all of it: $(pretty "$here")/install.sh --uninstall   Start over: --reinstall"
 	hash -r
 	check_deps silent
 	problems=$((problems + missing_count))
@@ -1148,8 +1259,9 @@ EOF
 
 # ── uninstall ───────────────────────────────────────────────────────────────
 uninstall() {
-	step_total=3
-	local f l found=0
+	step_total=5
+	local f l found=0 kind a b i
+	local -a pkgs=() syspkgs=() lines=()
 	step "Removing the quartz link"
 	if [ -L "$qs_link" ] && [ "$(readlink -f "$qs_link")" = "$(readlink -f "$here/shell")" ]; then
 		run rm -- "$qs_link" && [ $dry -eq 0 ] && ok "Removed $(pretty "$qs_link")."
@@ -1174,17 +1286,94 @@ uninstall() {
 		while IFS= read -r l; do note "  $(pretty "${l%%:*}"):$(cut -d: -f2 <<<"$l")"; done <<<"$elsewhere"
 	fi
 
+	step "Removing what the installer added"
+	if hypr_live && quartz_running; then
+		ask "quartz is running. Stop it now?" y && run_q qs kill -c quartz
+	fi
+	if [ -f "$manifest" ]; then
+		mapfile -t lines <"$manifest"
+		# newest first, so a file is removed before the one it replaced comes back
+		for ((i = ${#lines[@]} - 1; i >= 0; i--)); do
+			IFS=$'\t' read -r kind a b <<<"${lines[$i]}"
+			case $kind in
+				file) if [ -e "$a" ] || [ -L "$a" ]; then run rm -rf -- "$a" && [ $dry -eq 0 ] && ok "Removed $(pretty "$a")"; fi ;;
+				link) if [ -L "$a" ]; then run rm -- "$a" && [ $dry -eq 0 ] && ok "Removed $(pretty "$a")"; fi ;;
+				dir) if [ -d "$a" ] && [ -z "$(ls -A "$a" 2>/dev/null)" ]; then run rmdir -- "$a"; fi ;;
+				backup)
+					if [ -e "$b" ] || [ -L "$b" ]; then
+						if [ -e "$a" ] || [ -L "$a" ]; then run rm -rf -- "$a"; fi
+						run mv -- "$b" "$a" && [ $dry -eq 0 ] && ok "Put yours back: $(pretty "$a")"
+					fi ;;
+				shell) if ask "Switch your login shell back to $a?" y; then
+						if tty_ok && [ $yes -eq 0 ]; then sys_run chsh -s "$a" </dev/tty; else note "Run it yourself: chsh -s $a"; fi
+					fi ;;
+				pkg) if pacman -Q "$a" >/dev/null 2>&1 && ! in_list "$a" "${pkgs[@]}"; then pkgs+=("$a"); fi ;;
+				syspkg) if pacman -Q "$a" >/dev/null 2>&1 && ! in_list "$a" "${syspkgs[@]}"; then syspkgs+=("$a"); fi ;;
+			esac
+		done
+	else
+		note "No record of an install here ($(pretty "$manifest")): removing only quartz's settings and caches."
+	fi
+	# quartz's .zshrc fetched zinit and its plugins, and compinit left its cache
+	if recorded file "${ZDOTDIR:-$HOME}/.zshrc"; then
+		for f in "$data_home/zinit" "${ZDOTDIR:-$HOME}"/.zcompdump*; do
+			if [ -e "$f" ]; then run rm -rf -- "$f" && [ $dry -eq 0 ] && ok "Removed $(pretty "$f")"; fi
+		done
+	fi
+	if recorded file "$cfg_home/starship.toml" && [ -d "$HOME/.cache/starship" ]; then run rm -rf -- "$HOME/.cache/starship"; fi
+	for f in "$state_dir" "$cache_dir"; do
+		if [ -e "$f" ]; then run rm -rf -- "$f" && [ $dry -eq 0 ] && ok "Removed $(pretty "$f")"; fi
+	done
+	# folders the installer made that are empty now (rmdir only takes empty ones; it stops at the first that isn't)
+	if [ $dry -eq 0 ]; then
+		for l in "${lines[@]}"; do
+			IFS=$'\t' read -r kind a b <<<"$l"
+			case $kind in file | link | dir) tidy "$(dirname "$a")" ;; esac
+		done
+		for f in "$cfg_home/quickshell" "$HOME/.cache/x" "$state_dir"; do tidy "$(dirname "$f")"; done
+	fi
+
+	step "Packages"
+	if [ "${keep_pkgs:-0}" = 1 ]; then
+		ok "--reinstall: the packages stay."
+	elif [ ${#pkgs[@]} -eq 0 ] && [ ${#syspkgs[@]} -eq 0 ]; then
+		ok "This installer didn't install any packages that are still here."
+	else
+		if [ ${#pkgs[@]} -gt 0 ]; then
+			act "Installed for quartz: ${pkgs[*]}"
+			ask "Remove them?" y && remove_pkgs "${pkgs[@]}"
+		fi
+		if [ ${#syspkgs[@]} -gt 0 ]; then
+			act "Also installed by it, and your system leans on them (network, sound, Bluetooth, shell): ${syspkgs[*]}"
+			note "Without them there's no network, sound or Bluetooth until you set up others."
+			ask "Remove these too?" n && remove_pkgs "${syspkgs[@]}"
+		fi
+	fi
+
 	step "Finishing"
 	if hypr_live && [ "${hypr_changed:-0}" = 1 ]; then
 		ask "Reload Hyprland now so quartz's keys go away?" y && run_q hyprctl reload
 	fi
-	if hypr_live && quartz_running; then
-		ask "quartz is still running. Stop it now?" y && run_q qs kill -c quartz
-	fi
 	say ""
-	say "Left in place: quartz's settings ($(pretty "$state_dir")), fonts, packages, your wallpapers,"
-	say "the backups this installer made (*.quartz-backup-*) and the quartz folder itself ($(pretty "$here"))."
+	say "Left in place: your wallpapers (only the ones quartz copied in are gone) and the quartz"
+	say "folder itself ($(pretty "$here")); delete that by hand if you're done with it."
 	[ $dry -eq 1 ] && say "${B}Dry run: nothing was changed.${N}"
+	return 0
+}
+# tidy dir → remove it and its parents while they're empty, never $HOME or anything above it
+tidy() {
+	local d=$1
+	while [[ $d == "$HOME"/?* ]] && [ -d "$d" ] && [ -z "$(ls -A "$d" 2>/dev/null)" ]; do
+		rmdir -- "$d" 2>/dev/null || break
+		d=$(dirname "$d")
+	done
+}
+# remove_pkgs pkg… → pacman -Rns; one by one when something else needs one of them
+remove_pkgs() {
+	local p
+	sys_run sudo pacman -Rns --noconfirm "$@" && return
+	note "pacman wouldn't remove them all at once; trying one at a time."
+	for p in "$@"; do sys_run sudo pacman -Rns --noconfirm "$p" >/dev/null 2>&1 || note "Kept $p: something else needs it."; done
 }
 
 # ── main ────────────────────────────────────────────────────────────────────
@@ -1199,7 +1388,10 @@ fi
 
 say "${B}quartz installer${N}"
 if [ $mode = uninstall ]; then
-	say "This removes what the installer added: the quartz link and its block in your Hyprland config."
+	say "This undoes what the installer did: its configs, links, fonts, cursor, wallpapers, settings"
+	say "and caches go, the configs it replaced come back, and it offers to remove its packages."
+elif [ $mode = reinstall ]; then
+	say "This removes quartz (keeping the packages), then sets it up again from scratch."
 else
 	say "This sets up quartz, a desktop shell for Hyprland (bar, panels, launcher, notifications,"
 	say "lock screen). It explains each step and asks before it installs or changes anything;"
@@ -1212,6 +1404,14 @@ if [ $mode = uninstall ]; then
 	uninstall
 	exit 0
 fi
+if [ $mode = reinstall ]; then
+	keep_pkgs=1 uninstall
+	[ $dry -eq 1 ] && { say ""; say "(Dry run: the install below sees your files as they are now, not as the removal would leave them.)"; }
+	detect_hypr
+	step_n=0 step_total=9 hypr_changed=0
+	say ""
+	say "${B}Installing again${N}"
+fi
 
 skip_keys=() user_clip=0 elsewhere="" fresh=0 keymap=0
 [ "$hypr_mode" != none ] && scan_hypr
@@ -1222,6 +1422,7 @@ hardware
 packages
 fonts
 link
+terminal
 hyprland
 wallpapers
 start
